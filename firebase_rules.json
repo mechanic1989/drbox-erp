@@ -1,0 +1,24 @@
+{
+  "rules": {
+    "invites": {
+      "$emailKey": {
+        ".read": "auth != null && (auth.token.email.toLowerCase().replace('.', ',') === $emailKey || data.child('owner').val() === auth.uid)",
+        ".write": "auth != null && ((!data.exists() && newData.child('owner').val() === auth.uid) || data.child('owner').val() === auth.uid || auth.token.email.toLowerCase().replace('.', ',') === $emailKey)"
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && ($uid === auth.uid || data.child('members').child(auth.uid).exists())",
+        "members": {
+          ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin')",
+          "$mid": {
+            ".write": "auth != null && $mid === auth.uid && root.child('invites').child(auth.token.email.toLowerCase().replace('.', ',')).child('owner').val() === $uid"
+          }
+        },
+        "$other": {
+          ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin' || data.parent().child('members').child(auth.uid).child('role').val() === 'editor')"
+        }
+      }
+    }
+  }
+}
