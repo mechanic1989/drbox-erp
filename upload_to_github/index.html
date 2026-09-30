@@ -750,15 +750,24 @@ function fbReplaceAll(k,arr){
   return fbDb.ref(fbRoot()+'/rec/'+k).set(Object.keys(map).length?map:null);
 }
 
+// 로그인 방식 선택
+//  · 기본은 팝업: 삼성 인터넷·크롬·사파리 등 최신 폰 브라우저는 "추적 방지" 때문에 리다이렉트 방식의 로그인 결과를 못 받는 경우가 많음
+//    (로그인 후 다시 로그인 화면으로 돌아오는 증상 · auth/missing-initial-state)
+//  · 카카오톡·네이버 등 앱 안의 브라우저(인앱)와 아이폰 홈 화면 앱은 팝업이 안 돌아오므로 리다이렉트
+//  · 팝업이 차단되면 자동으로 리다이렉트로 재시도
+function _fbInAppBrowser(){ var ua=navigator.userAgent||''; return /KAKAOTALK|NAVER\(inapp|FBAN|FBAV|FB_IAB|Instagram|Line\/|DaumApps|; wv\)/i.test(ua); }
+function _fbIosStandalone(){ return /iPhone|iPad|iPod/i.test(navigator.userAgent||'')&&(window.navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)); }
+function _fbLoginErr(msg){ var el=document.getElementById('fb_login_err'); if(el){ el.textContent=msg; el.style.display='block'; } else alert(msg); }
 function signInWithGoogle(){
   if(!fbReady){ alert('인터넷 연결이 없거나 Firebase를 불러오지 못해 Google 로그인을 사용할 수 없습니다.\n'+(location.protocol==='file:'?'"로컬 모드로 사용"을 눌러주세요.':'인터넷 연결을 확인한 뒤 새로고침하세요.')); return; }
   var provider = new firebase.auth.GoogleAuthProvider();
-  // 모바일(특히 iOS Safari/카카오 인앱)에서는 팝업이 차단되는 경우가 많아 리다이렉트 방식 사용
-  var isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  var p = isMobile ? fbAuth.signInWithRedirect(provider) : fbAuth.signInWithPopup(provider);
-  p.catch(function(err){
-    if(err && err.code==='auth/popup-blocked'){ fbAuth.signInWithRedirect(provider); return; }
-    alert('로그인 실패: '+err.message);
+  var errEl=document.getElementById('fb_login_err'); if(errEl) errEl.style.display='none';
+  var fail=function(err){ var c=(err&&err.code)||''; if(!err||c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request') return; _fbLoginErr('로그인 실패: '+(err.message||c)); };
+  if(_fbInAppBrowser()||_fbIosStandalone()){ try{ sessionStorage.setItem('fb_login_try','redirect'); }catch(e){} fbAuth.signInWithRedirect(provider).catch(fail); return; }
+  fbAuth.signInWithPopup(provider).catch(function(err){
+    var c=(err&&err.code)||'';
+    if(c==='auth/popup-blocked'||c==='auth/operation-not-supported-in-this-environment'||c==='auth/web-storage-unsupported'){ try{ sessionStorage.setItem('fb_login_try','redirect'); }catch(e){} fbAuth.signInWithRedirect(provider).catch(fail); return; }
+    fail(err);
   });
 }
 
@@ -923,6 +932,17 @@ function _fbShowUser(user){
   var tb=document.getElementById('team_btn'); if(tb){ tb.style.display=''; tb.textContent=fbOwnerUid?'👥 팀·'+roleLbl.slice(0,3):'👥'; }
 }
 if(fbReady){
+  // 리다이렉트 방식으로 돌아온 경우: 결과 처리 실패를 화면에 알림 (추적 방지 브라우저에서 조용히 실패하던 문제)
+  try{
+    if(typeof fbAuth.getRedirectResult==='function') fbAuth.getRedirectResult().catch(function(err){
+      var c=(err&&err.code)||'';
+      var msg=(c==='auth/missing-initial-state'||c==='auth/web-storage-unsupported')
+        ?'이 브라우저의 추적 방지(사생활 보호) 기능 때문에 로그인 결과를 받지 못했습니다. "Google 계정으로 로그인"을 다시 누르면 다른 방식(팝업)으로 로그인합니다. 계속 안 되면 크롬 브라우저로 열어주세요.'
+        :'로그인 처리 중 오류: '+((err&&err.message)||c);
+      var show=function(){ _fbLoginErr(msg); };
+      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',show); else show();
+    });
+  }catch(e){}
   fbAuth.onAuthStateChanged(function(user){
     var loginScreen = document.getElementById('fb_login_screen');
     // 로컬 모드 중이면 auth 변화 무시
@@ -1014,6 +1034,7 @@ if(fbReady){
     <div style="font-size:10px;color:#aaa;margin-top:12px">로컬 모드: 데이터가 이 브라우저에만 저장됩니다<br>Google 로그인 시 여러 기기에서 동기화됩니다</div>
     </div>
     <div id="web_login_hint" style="display:none;font-size:10px;color:#aaa;margin-top:16px">같은 Google 계정으로 로그인하면 PC·폰 어디서나 같은 데이터를 봅니다</div>
+    <div id="fb_login_err" style="display:none;margin-top:12px;padding:8px 10px;background:#FFEBEE;border:1px solid #EF9A9A;border-radius:8px;font-size:11px;color:#B71C1C;font-weight:700;text-align:left;line-height:1.5"></div>
     <div id="fb_offline_hint" style="display:none;margin-top:12px;padding:8px 10px;background:#FFF3E0;border:1px solid #FFCC80;border-radius:8px;font-size:11px;color:#E65100;font-weight:700">⚠️ 인터넷 연결이 없어 Google 로그인을 사용할 수 없습니다.<br><span class="hint-file">로컬 모드로 사용하거나 연결 후 새로고침하세요.</span><span class="hint-web">인터넷 연결을 확인한 뒤 새로고침하세요.</span></div>
   </div>
 </div>
@@ -1036,7 +1057,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.1</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.2</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
