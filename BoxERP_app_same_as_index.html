@@ -1057,7 +1057,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.2</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.3</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -7789,7 +7789,7 @@ function saveOrder(){
       jeonj:data.전장||'',jeonp:data.jeonp||'',rp:data.재단p||'',
       nalgae:data.nalgae||'',jeolsu:data.jeolsu||'',
       buy_price:data.buy_price||0,
-      status:'미발주',note:'수주: '+data.num,fromOrder:data.num});
+      status:'미발주',note:'',fromOrder:data.num}); // 비고는 발주 때 직접 입력한 내용만 (연결은 fromOrder 로)
     saveData('pos',pos);
     // 입고 자동생성
     const stocks=loadData('stocks');
@@ -7804,7 +7804,7 @@ function saveOrder(){
       if(p.fromOrder===oldNum){
         pos[i]=Object.assign(pos[i],{product:data.product,flute:data.flute,paper:data.paper,
           qty:data.qty,due:data.due,vendor:data.vendor||p.vendor||'',
-          buy_price:data.buy_price||p.buy_price||0,note:'수주: '+data.num,fromOrder:data.num});
+          buy_price:data.buy_price||p.buy_price||0,fromOrder:data.num}); // 발주 비고(note)는 사용자가 입력한 그대로 유지
       }
     });
     saveData('pos',pos);
@@ -8137,6 +8137,22 @@ function deletePO(idx){
 }
 
 // ════ 발주서 재출력 ════
+// ── 발주서(JPEG) 텍스트 도우미 ──
+//  · html2canvas 는 word-break:break-all 상태에서 한 "덩어리"가 줄바꿈되면 글자가 겹쳐 그려지는 버그가 있음
+//    → 셀은 keep-all 로 두고, 띄어쓰기 없는 8자 이상 덩어리에는 글자 사이에 <wbr>(줄바꿈 허용점)을 넣어 겹침 없이 줄바꿈
+function poPrintText(t){
+  var esc=String(t===undefined||t===null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc.replace(/[^\s&;]{8,}/g,function(tok){
+    // 닫는 괄호·문장부호 앞, 여는 괄호 뒤에서는 줄바꿈하지 않음 (예: "(완제품" / ")" 로 갈라지는 것 방지)
+    return tok.split('').join('<wbr>').replace(/<wbr>(?=[)\]}>,.!?%])/g,'').replace(/([(\[{])<wbr>/g,'$1');
+  });
+}
+//  · 비고: 발주 때 직접 입력한 내용만 (예전 버전이 자동으로 붙이던 "수주: SO…" 는 제거)
+function poNoteClean(note){
+  var t=String(note||'').replace(/수주\s*[:：]\s*[A-Za-z0-9\-_]+/g,'');
+  t=t.replace(/^[\s|,\/\-·]+|[\s|,\/\-·]+$/g,'').replace(/\s*\|\s*\|\s*/g,' | ');
+  return t;
+}
 function reprintPO(idx){
   const pos=loadData('pos');
   const p=pos[idx];
@@ -8194,7 +8210,7 @@ function reprintPO(idx){
       +(palletQtyVal?'<br><span style="font-size:9px;color:#555">('+palletQtyVal.toLocaleString()+'개/P)</span>':'');
     return '<tr>'
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+(i+1)+'</td>'
-      +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left"><span style="font-size:14px">'+(item.product||'-')+'</span>'+(mItem&&mItem.buy_code?'<br><span style="font-size:14px;font-weight:700;color:#1A237E">'+mItem.buy_code+'</span>':'')+'</td>'
+      +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left"><div style="font-size:14px">'+poPrintText(item.product||'-')+'</div>'+(mItem&&mItem.buy_code?'<div style="font-size:14px;font-weight:700;color:#1A237E">'+poPrintText(mItem.buy_code)+'</div>':'')+'</td>'
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+(item.flute||'-')+'</td>'
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+((item.paper||'').toUpperCase()||'-')+'</td>'
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+jeonj+'</td>'
@@ -8209,7 +8225,7 @@ function reprintPO(idx){
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+bonghap+'</td>'
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+pallet+'</td>'
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center;font-size:10px">'+inkStr+'</td>'
-      +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left">'+(item.note||'')+'</td>'
+      +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left">'+poPrintText(poNoteClean(item.note))+'</td>'
       +'</tr>';
   }).join('');
 
@@ -8222,7 +8238,7 @@ function reprintPO(idx){
     +'.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #333;margin-bottom:10px}'
     +'table{width:100%;border-collapse:collapse;margin-bottom:10px;table-layout:fixed}'
     +'th{background:#333;color:#fff;padding:7px 5px;border:1px solid #555;font-size:11px;word-break:keep-all}'
-    +'td{padding:6px 5px;border:1px solid #ccc;font-size:11px;text-align:center;word-break:break-all}'
+    +'td{padding:6px 5px;border:1px solid #ccc;font-size:11px;text-align:center;word-break:keep-all;overflow-wrap:break-word;line-height:1.35}'
     +'.noprint{text-align:center;padding:10px;background:#f5f5f5;margin-bottom:14px;border-radius:8px}'
     +'@media print{.noprint{display:none}}</style></head><body>'
     +'<div class="noprint"><button onclick="window.print()" style="padding:8px 22px;background:#4A148C;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ 인쇄</button>'
@@ -8593,7 +8609,7 @@ function printPO(){
         +(palletQtyVal?'<br><span style="font-size:9px;color:#555">('+palletQtyVal.toLocaleString()+'개/P)</span>':'');
       return '<tr>'
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+(i+1)+'</td>'
-        +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left"><span style="font-size:14px">'+(p.product||'-')+'</span>'+(mItem&&mItem.buy_code?'<br><span style="font-size:14px;font-weight:700;color:#1A237E">'+mItem.buy_code+'</span>':'')+'</td>'
+        +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left"><div style="font-size:14px">'+poPrintText(p.product||'-')+'</div>'+(mItem&&mItem.buy_code?'<div style="font-size:14px;font-weight:700;color:#1A237E">'+poPrintText(mItem.buy_code)+'</div>':'')+'</td>'
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+(p.flute||'-')+'</td>'
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+((p.paper||'').toUpperCase()||'-')+'</td>'
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+jeonj+'</td>'
@@ -8608,7 +8624,7 @@ function printPO(){
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+(bonghap||'-')+'</td>'
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+(pallet||'-')+'</td>'
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center;font-size:10px">'+(inkStr||'-')+'</td>'
-        +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left">'+(p.note||'')+'</td>'
+        +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left">'+poPrintText(poNoteClean(p.note))+'</td>'
         +'</tr>';
     }).join('');
 
@@ -8621,7 +8637,7 @@ function printPO(){
       +'.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #333;margin-bottom:10px}'
       +'table{width:100%;border-collapse:collapse;margin-bottom:10px;table-layout:fixed}'
       +'th{background:#333;color:#fff;padding:7px 5px;border:1px solid #555;font-size:11px;word-break:keep-all}'
-      +'td{padding:6px 5px;border:1px solid #ccc;font-size:11px;text-align:center;word-break:break-all}'
+      +'td{padding:6px 5px;border:1px solid #ccc;font-size:11px;text-align:center;word-break:keep-all;overflow-wrap:break-word;line-height:1.35}'
       +'.noprint{text-align:center;padding:10px;background:#f5f5f5;margin-bottom:14px;border-radius:8px}'
       +'@media print{.noprint{display:none}}</style></head><body>'
       +'<div class="noprint"><button onclick="window.print()" style="padding:8px 22px;background:#4A148C;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ 인쇄</button>'
