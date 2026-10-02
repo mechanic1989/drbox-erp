@@ -1057,7 +1057,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.4</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.5</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -6452,6 +6452,9 @@ function _showDeliveryPopup(targets, orders, stocks){
   });
 
   var devCostNote=hasPending?'<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#2E7D32">💰 미연동 개발비가 있습니다. 체크된 개발비는 이번 출고에 연동됩니다.</div>':'';
+  // 거래처가 여러 곳이면 출고번호(=거래명세표)가 거래처별로 따로 매겨짐
+  var _clientSet=[]; targets.forEach(function(t){ var c=(t.order&&t.order.client)||''; if(_clientSet.indexOf(c)===-1) _clientSet.push(c); });
+  if(_clientSet.length>1) devCostNote+='<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#795548">🏷️ 거래처 '+_clientSet.length+'곳('+_clientSet.map(function(c){ return String(c).replace(/</g,'&lt;'); }).join(', ')+')이 함께 선택되어 <b>출고번호가 거래처별로 따로</b> 매겨지고 거래명세표도 거래처별로 나옵니다. 운반비는 출고 수량 비율로 나눠 기록됩니다.</div>';
 
   overlay.innerHTML=''
     +'<div style="background:#fff;border-radius:12px;padding:24px;min-width:640px;max-width:92vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3)">'
@@ -6500,9 +6503,9 @@ function _showDeliveryPopup(targets, orders, stocks){
     const allDeliveries=loadData('deliveries');
     var latestDevCosts=loadData('devCosts');
     const errors=[];
-    const batchOutNo=generateOutNo();
     const batchDate=today();
-    var freightSaved=false;
+    // 1) 검증: 처리 가능한 항목만 추림
+    const okItems=[];
     targets.forEach(function(t,i){
       const qty=inputQtys[i];
       if(qty<=0) return;
@@ -6521,26 +6524,46 @@ function _showDeliveryPopup(targets, orders, stocks){
         errors.push(o.client+' / '+o.product+' : 수주수량 '+totalQty+'매 초과');
         return;
       }
-      allOrders[t.idx].outQty=newOutQty;
-      allOrders[t.idx].lastOutDate=batchDate;
-      allOrders[t.idx].outNo=batchOutNo;
-      allDeliveries.push({
-        outNo:batchOutNo,
-        orderNum:o.num,
-        client:o.client,
-        product:o.product,
-        qty:qty,
-        date:batchDate,
-        freight: freightSaved ? 0 : freight
-      });
-      freightSaved=true;
+      okItems.push({idx:t.idx,o:o,qty:qty,newOutQty:newOutQty});
     });
-    // 체크된 개발비 출고번호에 연동
+    // 2) 거래처별 묶음 → 거래처마다 출고번호 하나 (거래명세표는 거래처 단위이므로)
+    const groups=[];
+    okItems.forEach(function(it){ var c=it.o.client||''; var g=groups.find(function(x){ return x.client===c; }); if(!g){ g={client:c,items:[],qty:0}; groups.push(g); } g.items.push(it); g.qty+=it.qty; });
+    const totalShipQty=groups.reduce(function(a,g){ return a+g.qty; },0);
+    // 운반비: 거래처가 여러 곳이면 출고 수량 비율로 배분 (나머지는 첫 거래처에)
+    var freightLeft=freight;
+    groups.forEach(function(g,gi){
+      g.outNo=generateOutNo();
+      if(gi===groups.length-1) g.freight=freightLeft;
+      else { g.freight=(totalShipQty>0)?Math.round(freight*g.qty/totalShipQty):0; freightLeft-=g.freight; }
+    });
+    const outNoByClient={};
+    groups.forEach(function(g){
+      outNoByClient[g.client]=g.outNo;
+      var freightSaved=false;
+      g.items.forEach(function(it){
+        allOrders[it.idx].outQty=it.newOutQty;
+        allOrders[it.idx].lastOutDate=batchDate;
+        allOrders[it.idx].outNo=g.outNo;
+        allDeliveries.push({
+          outNo:g.outNo,
+          orderNum:it.o.num,
+          client:it.o.client,
+          product:it.o.product,
+          qty:it.qty,
+          date:batchDate,
+          freight: freightSaved ? 0 : g.freight
+        });
+        freightSaved=true;
+      });
+    });
+    const firstOutNo=groups.length?groups[0].outNo:'';
+    // 체크된 개발비 → 같은 거래처의 출고번호에 연동
     overlay.querySelectorAll('.dc_link_chk:checked').forEach(function(chk){
       var dcId=chk.getAttribute('data-dc-id');
       var dcIdx=latestDevCosts.findIndex(function(dc){return dc.id===dcId;});
-      if(dcIdx>=0){
-        latestDevCosts[dcIdx].linkedOutNo=batchOutNo;
+      if(dcIdx>=0&&firstOutNo){
+        latestDevCosts[dcIdx].linkedOutNo=outNoByClient[latestDevCosts[dcIdx].client||'']||firstOutNo;
         latestDevCosts[dcIdx].linkedDate=batchDate;
       }
     });
@@ -6549,6 +6572,7 @@ function _showDeliveryPopup(targets, orders, stocks){
     saveData('devCosts',latestDevCosts);
     document.body.removeChild(overlay);
     if(errors.length>0) alert('⚠️ 아래 항목은 처리되지 않았습니다:\n\n'+errors.join('\n'));
+    if(groups.length>1){ try{ showInfoToast('🚚 출고 완료 — 거래처 '+groups.length+'곳이라 출고번호를 따로 매겼습니다: '+groups.map(function(g){ return g.client+' '+g.outNo; }).join(' · '),'#2E7D32'); }catch(e){} }
     renderAll();
   };
 }
@@ -6948,7 +6972,8 @@ function printReceiptByOutNo(outNo){
   if(batch.length>0){
     // 신규 방식: deliveries 레코드에서 배치별 수량 직접 사용
     batch.forEach(function(d){
-      var order=orders.find(function(o){return o.num===d.orderNum;})||{};
+      // 수주가 지워졌어도 출고 기록(거래처·품명·일자)으로 명세표를 만들 수 있게
+      var order=orders.find(function(o){return o.num===d.orderNum;})||{num:d.orderNum||'',client:d.client||'',product:d.product||'',date:d.date||'',lastOutDate:d.date||''};
       group.push({order:order, batchQty:d.qty});
     });
   } else {
@@ -7040,13 +7065,38 @@ function _printReceiptMulti(orderList, outNo){
 
 function _doPrintReceipt(orderList, outNo, showPrice, selectedDevCostIds){
   if(!orderList||orderList.length===0) return;
-  var first=orderList[0].order;
-  var clients=loadData('clients');
-  var buyer=clients.find(function(c){return c.name===first.client;})||{};
   var mc=JSON.parse(store.getItem('mycompany')||'{}');
   if(!mc.name){
     if(!confirm('당사 정보가 설정되지 않았습니다.\n⚙️ 당사정보 버튼으로 먼저 설정하시겠습니까?\n\n(취소하면 빈 칸으로 출력합니다)')) return openMyCompanyModal();
   }
+  // 거래명세표는 거래처(공급받는자) 단위 문서 — 한 출고번호에 거래처가 여러 곳이면 거래처별로 따로 만들어 한 번에 인쇄
+  var byClient=[];
+  orderList.forEach(function(it){ var c=(it.order&&it.order.client)||''; var g=byClient.find(function(x){ return x.client===c; }); if(!g){ g={client:c,list:[]}; byClient.push(g); } g.list.push(it); });
+  var docs=byClient.map(function(g){ return _buildReceiptDoc(g.list,outNo,showPrice,selectedDevCostIds,mc); });
+  var pagesHtml=docs.map(function(d){ return d.pagesHtml; }).join('<div style="page-break-after:always"></div>');
+  var title=docs.length===1?docs[0].title:((outNo?('거래명세표_'+outNo):'거래명세표')+'_거래처'+docs.length+'곳');
+  var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
+    +'<title>'+title+'</title>'
+    +'<style>'
+    +'*{box-sizing:border-box;margin:0;padding:0}'
+    +'body{font-family:\'맑은 고딕\',\'Apple SD Gothic Neo\',sans-serif;background:#fff}'
+    +'table{border-collapse:collapse}'
+    +'@page{size:A4;margin:5mm}'
+    +'@media print{body{padding:0}}'
+    +'</style></head><body>'
+    +pagesHtml
+    +'<script>window.onload=function(){window.print();};<\/script>'
+    +'</body></html>';
+  var w=window.open('','_blank','width=900,height=1200');
+  if(w){w.document.write(html);w.document.close();}
+  else{alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.');}
+}
+// 거래처 하나의 거래명세표 페이지들 생성 → {pagesHtml,title}
+function _buildReceiptDoc(orderList, outNo, showPrice, selectedDevCostIds, mc){
+  var first=orderList[0].order;
+  var clients=loadData('clients');
+  var buyer=clients.find(function(c){return c.name===first.client;})||{};
+  mc=mc||JSON.parse(store.getItem('mycompany')||'{}');
   var master=loadData('master');
   var now=new Date();
   var docDate=(first.lastOutDate||today()).replace(/-/g,'-'); // YYYY-MM-DD
@@ -7073,6 +7123,7 @@ function _doPrintReceipt(orderList, outNo, showPrice, selectedDevCostIds){
     selectedDevCostIds.forEach(function(dcId){
       var dc=_devCosts.find(function(d){return d.id===dcId;});
       if(!dc||!dc.billed) return;
+      if((dc.client||'')!==(first.client||'')) return; // 다른 거래처의 개발비는 그 거래처 명세표에
       var amt=+(dc.chargeAmt||0);
       // 날짜: 연동된 출고의 날짜 우선, 없으면 개발비 등록일
       var rowDate='';
@@ -7087,7 +7138,7 @@ function _doPrintReceipt(orderList, outNo, showPrice, selectedDevCostIds){
     // selectedDevCostIds가 아예 없는 경우(구버전 호환): linkedOutNo 기준 자동 포함
     var _deliveries=loadData('deliveries');
     var _devCosts=loadData('devCosts');
-    _deliveries.filter(function(d){return d.outNo===outNo;}).forEach(function(d){
+    _deliveries.filter(function(d){return d.outNo===outNo&&(d.client||'')===(first.client||'');}).forEach(function(d){
       _devCosts.filter(function(dc){
         return dc.linkedOutNo===outNo && dc.client===d.client && dc.product===d.product && dc.billed;
       }).forEach(function(dc){
@@ -7280,21 +7331,7 @@ function _doPrintReceipt(orderList, outNo, showPrice, selectedDevCostIds){
   });
 
   var title=outNoLabel?('거래명세표_'+outNoLabel):('거래명세표_'+first.num);
-  var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
-    +'<title>'+title+'</title>'
-    +'<style>'
-    +'*{box-sizing:border-box;margin:0;padding:0}'
-    +'body{font-family:\'맑은 고딕\',\'Apple SD Gothic Neo\',sans-serif;background:#fff}'
-    +'table{border-collapse:collapse}'
-    +'@page{size:A4;margin:5mm}'
-    +'@media print{body{padding:0}}'
-    +'</style></head><body>'
-    +pagesHtml
-    +'<script>window.onload=function(){window.print();};<\/script>'
-    +'</body></html>';
-  var w=window.open('','_blank','width=900,height=1200');
-  if(w){w.document.write(html);w.document.close();}
-  else{alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.');}
+  return {pagesHtml:pagesHtml,title:title};
 }
 
 function deliveryCancelOne(idx){
