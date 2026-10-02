@@ -1060,7 +1060,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.7</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.8</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -7086,13 +7086,24 @@ function _printReceiptMulti(orderList, outNo){
       +'</div>';
   }
 
-  // ── 단가 표시 여부 선택 팝업 ──
+  // ── 출력 방식(이미지/인쇄) + 단가 표시 여부 선택 팝업 ──
+  var defMode=_receiptOutMode();
+  var modeBtn=function(val,ico,label,sub){
+    var on=(val===defMode);
+    return '<label class="_rcpt_mode" data-mode="'+val+'" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 6px;border:1.5px solid '+(on?'#1B5E20':'#D0D8E4')+';border-radius:8px;font-size:12px;font-weight:700;color:'+(on?'#1B5E20':'#555')+';cursor:pointer;background:'+(on?'#F1F8E9':'#fff')+'">'
+      +'<input type="radio" name="_rcpt_mode" value="'+val+'" '+(on?'checked':'')+' style="position:absolute;opacity:0;width:0;height:0">'
+      +'<span>'+ico+' '+label+'</span><span style="font-size:10px;font-weight:400;color:#666">'+sub+'</span></label>';
+  };
   var overlay=document.createElement('div');
-  overlay.className='dyn-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.className='dyn-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:10px';
   overlay.innerHTML=
-    '<div style="background:#fff;border-radius:12px;padding:24px 28px;min-width:340px;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.25);text-align:center">'
-    +'<div style="font-size:16px;font-weight:700;color:#1B5E20;margin-bottom:6px">🖨️ 거래명세표 출력</div>'
-    +'<div style="font-size:12px;color:#555;margin-bottom:14px">단가를 출력에 포함하시겠습니까?</div>'
+    '<div style="background:#fff;border-radius:12px;padding:22px 24px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.25);text-align:center">'
+    +'<div style="font-size:16px;font-weight:700;color:#1B5E20;margin-bottom:6px">🧾 거래명세표 출력</div>'
+    +'<div style="font-size:12px;color:#555;margin-bottom:10px">출력 방식을 고르고, 단가 표시 여부를 선택하세요</div>'
+    +'<div style="display:flex;gap:8px;position:relative">'
+      +modeBtn('img','🖼️','이미지(JPEG)','발주서처럼 그림으로 · 폰에서도 됨 · 카톡 전송')
+      +modeBtn('print','🖨️','프린터 인쇄','PC에서 새 창으로 바로 인쇄')
+    +'</div>'
     +devSection
     +'<div style="display:flex;gap:10px;justify-content:center;margin-top:16px">'
       +'<button id="_receipt_noprice" style="flex:1;padding:11px 0;background:#1B5E20;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">단가 없이 출력<br><span style="font-size:10px;font-weight:400;opacity:.85">(기본)</span></button>'
@@ -7105,24 +7116,29 @@ function _printReceiptMulti(orderList, outNo){
   function getSelectedDevIds(){
     return Array.from(overlay.querySelectorAll('._rcpt_dev_chk:checked')).map(function(el){return el.getAttribute('data-dcid');});
   }
+  function getMode(){ var r=overlay.querySelector('input[name=_rcpt_mode]:checked'); return (r&&r.value)||defMode; }
+  Array.prototype.forEach.call(overlay.querySelectorAll('._rcpt_mode'),function(lb){
+    lb.querySelector('input').addEventListener('change',function(){
+      Array.prototype.forEach.call(overlay.querySelectorAll('._rcpt_mode'),function(x){ var on=x.querySelector('input').checked; x.style.borderColor=on?'#1B5E20':'#D0D8E4'; x.style.color=on?'#1B5E20':'#555'; x.style.background=on?'#F1F8E9':'#fff'; });
+    });
+  });
   document.getElementById('_receipt_cancel').onclick=doClose;
-  document.getElementById('_receipt_noprice').onclick=function(){ var ids=getSelectedDevIds(); doClose(); _doPrintReceipt(orderList,outNo,false,ids); };
-  document.getElementById('_receipt_withprice').onclick=function(){ var ids=getSelectedDevIds(); doClose(); _doPrintReceipt(orderList,outNo,true,ids); };
+  document.getElementById('_receipt_noprice').onclick=function(){ var ids=getSelectedDevIds(), mode=getMode(); doClose(); _doPrintReceipt(orderList,outNo,false,ids,mode); };
+  document.getElementById('_receipt_withprice').onclick=function(){ var ids=getSelectedDevIds(), mode=getMode(); doClose(); _doPrintReceipt(orderList,outNo,true,ids,mode); };
 }
 
-function _doPrintReceipt(orderList, outNo, showPrice, selectedDevCostIds){
-  if(!orderList||orderList.length===0) return;
-  var mc=JSON.parse(store.getItem('mycompany')||'{}');
-  if(!mc.name){
-    if(!confirm('당사 정보가 설정되지 않았습니다.\n⚙️ 당사정보 버튼으로 먼저 설정하시겠습니까?\n\n(취소하면 빈 칸으로 출력합니다)')) return openMyCompanyModal();
-  }
-  // 거래명세표는 거래처(공급받는자) 단위 문서 — 한 출고번호에 거래처가 여러 곳이면 거래처별로 따로 만들어 한 번에 인쇄
-  var byClient=[];
-  orderList.forEach(function(it){ var c=(it.order&&it.order.client)||''; var g=byClient.find(function(x){ return x.client===c; }); if(!g){ g={client:c,list:[]}; byClient.push(g); } g.list.push(it); });
-  var docs=byClient.map(function(g){ return _buildReceiptDoc(g.list,outNo,showPrice,selectedDevCostIds,mc); });
+// 기본 출력 방식: 마지막 선택을 기억 · 처음에는 폰(좁은 화면·터치)은 이미지, PC는 인쇄
+function _receiptOutMode(){
+  var saved=''; try{ saved=store.getItem('receipt_out_mode')||''; }catch(e){}
+  if(saved==='img'||saved==='print') return saved;
+  var mobile=false; try{ mobile=window.matchMedia('(max-width:768px)').matches||/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||''); }catch(e){}
+  return mobile?'img':'print';
+}
+// 인쇄용 전체 HTML (새 창)
+function _receiptPrintHtml(docs, outNo){
   var pagesHtml=docs.map(function(d){ return d.pagesHtml; }).join('<div style="page-break-after:always"></div>');
   var title=docs.length===1?docs[0].title:((outNo?('거래명세표_'+outNo):'거래명세표')+'_거래처'+docs.length+'곳');
-  var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
+  return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
     +'<title>'+title+'</title>'
     +'<style>'
     +'*{box-sizing:border-box;margin:0;padding:0}'
@@ -7134,9 +7150,127 @@ function _doPrintReceipt(orderList, outNo, showPrice, selectedDevCostIds){
     +pagesHtml
     +'<script>window.onload=function(){window.print();};<\/script>'
     +'</body></html>';
-  var w=window.open('','_blank','width=900,height=1200');
-  if(w){w.document.write(html);w.document.close();}
-  else{alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.');}
+}
+function _openReceiptPrintWindow(html){
+  var w=null; try{ w=window.open('','_blank','width=900,height=1200'); }catch(e){ w=null; }
+  if(w&&w.document){ try{ w.document.write(html); w.document.close(); return true; }catch(e){} }
+  alert('인쇄 창을 열지 못했습니다 (팝업 차단 또는 폰 브라우저).\n🖼️ 이미지(JPEG) 방식을 선택하면 폰에서도 저장·전송할 수 있습니다.');
+  return false;
+}
+
+function _doPrintReceipt(orderList, outNo, showPrice, selectedDevCostIds, mode){
+  if(!orderList||orderList.length===0) return;
+  var mc=JSON.parse(store.getItem('mycompany')||'{}');
+  if(!mc.name){
+    if(!confirm('당사 정보가 설정되지 않았습니다.\n⚙️ 당사정보 버튼으로 먼저 설정하시겠습니까?\n\n(취소하면 빈 칸으로 출력합니다)')) return openMyCompanyModal();
+  }
+  mode=(mode==='img'||mode==='print')?mode:_receiptOutMode();
+  try{ store.setItem('receipt_out_mode',mode); }catch(e){}
+  // 거래명세표는 거래처(공급받는자) 단위 문서 — 한 출고번호에 거래처가 여러 곳이면 거래처별로 따로 만들어 한 번에 인쇄
+  var byClient=[];
+  orderList.forEach(function(it){ var c=(it.order&&it.order.client)||''; var g=byClient.find(function(x){ return x.client===c; }); if(!g){ g={client:c,list:[]}; byClient.push(g); } g.list.push(it); });
+  var docs=byClient.map(function(g){ var d=_buildReceiptDoc(g.list,outNo,showPrice,selectedDevCostIds,mc); d.client=g.client; return d; });
+  var html=_receiptPrintHtml(docs,outNo);
+  if(mode==='img'){ _receiptToImages(docs,outNo,html); return; }
+  _openReceiptPrintWindow(html);
+}
+
+// ════ 거래명세표 → 이미지(JPEG) (발주서와 같은 방식 · 폰에서 저장·공유 가능) ════
+function _receiptSafeName(s){ return String(s||'').replace(/[\\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').trim(); }
+function _receiptToImages(docs, outNo, printHtml){
+  if(typeof html2canvas==='undefined'){
+    alert('이미지 라이브러리(html2canvas)를 불러오지 못했습니다.\n인터넷 연결을 확인하고 새로고침한 뒤 다시 시도하거나, 🖨️ 프린터 인쇄 방식을 선택하세요.');
+    return;
+  }
+  // 문서(거래처)별 페이지 div 수집
+  var pages=[];
+  docs.forEach(function(d){
+    var host=document.createElement('div'); host.innerHTML=d.pagesHtml;
+    var pageEls=Array.prototype.filter.call(host.children,function(el){ return /287mm/.test(el.getAttribute('style')||''); });
+    pageEls.forEach(function(el,i){ pages.push({client:d.client||'',title:d.title||'거래명세표',el:el,pageNum:i+1,total:pageEls.length}); });
+  });
+  if(!pages.length){ alert('만들 페이지가 없습니다.'); return; }
+  var W=780;
+  var cap=document.createElement('div'); cap.id='__rcpt_capture__';
+  cap.style.cssText='position:fixed;top:0;left:0;width:'+W+'px;background:#fff;z-index:60000;overflow:hidden;font-family:\'맑은 고딕\',\'Malgun Gothic\',\'Apple SD Gothic Neo\',\'Noto Sans KR\',sans-serif;color:#000;font-size:10px;line-height:1.3';
+  document.body.appendChild(cap);
+  var loading=document.createElement('div');
+  loading.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:70000;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700;flex-direction:column;gap:12px;text-align:center';
+  var setMsg=function(i){ loading.innerHTML='<div>🧾 거래명세표 이미지 생성 중... ('+i+'/'+pages.length+')</div><div style="font-size:13px;opacity:0.85">잠시만 기다려 주세요</div>'; };
+  setMsg(1); document.body.appendChild(loading);
+  var results=[];
+  function cleanup(){ try{ cap.remove(); }catch(e){} try{ loading.remove(); }catch(e){} }
+  function next(i){
+    if(i>=pages.length){ cleanup(); _showReceiptImages(results,outNo,printHtml); return; }
+    var pg=pages[i]; setMsg(i+1);
+    cap.innerHTML='';
+    var wrap=document.createElement('div'); wrap.style.cssText='width:'+W+'px;padding:12px;background:#fff';
+    wrap.appendChild(pg.el); cap.appendChild(wrap);
+    setTimeout(function(){
+      html2canvas(wrap,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,width:W,windowWidth:W,windowHeight:Math.max(window.innerHeight,wrap.offsetHeight+40),scrollX:0,scrollY:0}).then(function(canvas){
+        canvas.toBlob(function(blob){
+          if(!blob){ cleanup(); alert('이미지 변환에 실패했습니다. 🖨️ 프린터 인쇄 방식으로 다시 시도해 보세요.'); return; }
+          var base=_receiptSafeName(pg.title+(pg.client?'_'+pg.client:''));
+          var name=base+(pg.total>1?'_'+pg.pageNum+'쪽':'')+'.jpg';
+          results.push({blob:blob,url:URL.createObjectURL(blob),name:name,client:pg.client,pageNum:pg.pageNum,total:pg.total});
+          next(i+1);
+        },'image/jpeg',0.92);
+      }).catch(function(err){
+        cleanup(); console.error('거래명세표 이미지 오류:',err);
+        alert('이미지 변환 실패: '+((err&&err.message)||err)+'\n🖨️ 프린터 인쇄 방식으로 다시 시도해 보세요.');
+      });
+    },120);
+  }
+  setTimeout(function(){ next(0); },250);
+}
+function _dlBlobUrl(url,name){
+  var a=document.createElement('a'); a.href=url; a.download=name||'image.jpg'; a.rel='noopener';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ try{ a.remove(); }catch(e){} },0);
+}
+function _showReceiptImages(results, outNo, printHtml){
+  var files=[];
+  try{ files=results.map(function(r){ return new File([r.blob],r.name,{type:'image/jpeg'}); }); }catch(e){ files=[]; }
+  var canShare=false;
+  try{ canShare=!!(files.length&&navigator.share&&navigator.canShare&&navigator.canShare({files:files})); }catch(e){ canShare=false; }
+  var old=document.getElementById('_rcpt_img_overlay'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='_rcpt_img_overlay'; ov.className='dyn-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:8px';
+  var btn='padding:11px 10px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;flex:1;min-width:110px';
+  ov.innerHTML='<div style="background:#fff;border-radius:12px;width:100%;max-width:560px;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3);overflow:hidden">'
+    +'<div style="padding:12px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:8px">'
+      +'<div style="flex:1;font-size:15px;font-weight:700;color:#1B5E20">🧾 거래명세표 이미지 ('+results.length+'장)</div>'
+      +'<button id="_rcpt_img_close" style="padding:4px 10px;background:#eee;border:none;border-radius:6px;font-size:14px;cursor:pointer">✕</button>'
+    +'</div>'
+    +'<div style="flex:1;overflow-y:auto;padding:12px 16px;background:#F3F4F6;-webkit-overflow-scrolling:touch">'
+      +results.map(function(r,i){
+        return '<div style="margin-bottom:12px">'
+          +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px">'
+            +'<span style="flex:1;font-weight:700;color:#333">'+_ddEsc(r.client||'거래명세표')+(r.total>1?' · '+r.pageNum+'/'+r.total+'쪽':'')+'</span>'
+            +'<button class="_rcpt_dl" data-i="'+i+'" style="padding:5px 10px;background:#fff;border:1px solid #1B5E20;color:#1B5E20;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">⬇ 저장</button>'
+          +'</div>'
+          +'<img src="'+r.url+'" alt="'+_ddEsc(r.name)+'" style="width:100%;border:1px solid #ddd;background:#fff;display:block">'
+        +'</div>';
+      }).join('')
+      +'<div style="font-size:11px;color:#666;text-align:center;padding:2px 0 6px">폰에서는 이미지를 길게 눌러 사진으로 저장할 수도 있습니다</div>'
+    +'</div>'
+    +'<div style="padding:10px 14px;border-top:1px solid #eee;display:flex;gap:8px;flex-wrap:wrap">'
+      +(canShare?'<button id="_rcpt_share" style="'+btn+';background:#FEE500;color:#3E2723">📤 공유 (카카오톡 등)</button>':'')
+      +'<button id="_rcpt_dl_all" style="'+btn+';background:#1B5E20;color:#fff">⬇ '+(results.length>1?'전체 저장':'저장')+'</button>'
+      +'<button id="_rcpt_print" style="'+btn+';background:#E8F5E9;color:#1B5E20;border:1.5px solid #A5D6A7">🖨️ 인쇄</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(ov);
+  var done=false;
+  function close(){ if(done) return; done=true; try{ ov.remove(); }catch(e){} setTimeout(function(){ results.forEach(function(r){ try{ URL.revokeObjectURL(r.url); }catch(e){} }); },60000); }
+  document.getElementById('_rcpt_img_close').onclick=close;
+  ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  Array.prototype.forEach.call(ov.querySelectorAll('._rcpt_dl'),function(b){ b.onclick=function(){ var r=results[+b.getAttribute('data-i')]; if(r) _dlBlobUrl(r.url,r.name); }; });
+  document.getElementById('_rcpt_dl_all').onclick=function(){ results.forEach(function(r,i){ setTimeout(function(){ _dlBlobUrl(r.url,r.name); },i*350); }); };
+  document.getElementById('_rcpt_print').onclick=function(){ _openReceiptPrintWindow(printHtml); };
+  var sh=document.getElementById('_rcpt_share');
+  if(sh) sh.onclick=function(){
+    navigator.share({files:files,title:'거래명세표'+(outNo?' '+outNo:'')}).catch(function(e){ if(!e||e.name!=='AbortError') alert('공유 실패: '+((e&&e.message)||e)+'\n⬇ 저장 후 사진으로 보내주세요.'); });
+  };
 }
 // 거래처 하나의 거래명세표 페이지들 생성 → {pagesHtml,title}
 function _buildReceiptDoc(orderList, outNo, showPrice, selectedDevCostIds, mc){
@@ -7215,9 +7349,10 @@ function _buildReceiptDoc(orderList, outNo, showPrice, selectedDevCostIds, mc){
       if(it){
         var unitLabel=it.isExtra?'':'매';
         var qtyLabel=it.isExtra?'':( it.qty?it.qty.toLocaleString():'' );
+        var nameTxt=(it.product||'')+(it.isExtra?'':it.spec?' ('+it.spec+')':''), nameLen=nameTxt.length; // 긴 품명은 글자를 줄여 잘리지 않게
         rows+='<tr style="height:21px">'
           +'<td style="'+BD+'text-align:center;padding:1px 2px">'+it.date+'</td>'
-          +'<td colspan="3" style="'+BD+'padding:1px 4px;overflow:hidden;white-space:nowrap">'+(it.product||'')+(it.isExtra?'':it.spec?' ('+it.spec+')':'')+'</td>'
+          +'<td colspan="3" style="'+BD+'padding:1px 4px;overflow:hidden;white-space:nowrap;font-size:'+(nameLen>34?'7.5px':nameLen>24?'8.5px':'10px')+'">'+nameTxt+'</td>'
           +'<td style="'+BD+'text-align:center;padding:1px 2px">'+unitLabel+'</td>'
           +'<td style="'+BD+'text-align:right;padding:1px 4px">'+qtyLabel+'</td>'
           +'<td style="'+BD+'text-align:right;padding:1px 4px">'+(SP&&it.uprice?it.uprice.toLocaleString():'')+'</td>'
@@ -7255,7 +7390,7 @@ function _buildReceiptDoc(orderList, outNo, showPrice, selectedDevCostIds, mc){
       +'<td style="'+BD+BG+TH+'padding:2px">일&nbsp;&nbsp;자</td>'
       +'<td style="'+BD+'padding:2px 5px">'+docDate+'</td>'
       +'<td style="'+BD+BG+TH+'padding:2px">No</td>'
-      +'<td style="'+BD+'padding:2px 5px">'+outNoLabel+'</td>'
+      +'<td style="'+BD+'padding:2px 3px;white-space:nowrap;font-size:'+(String(outNoLabel).length>14?'8.5px':'10px')+'">'+outNoLabel+'</td>'
       +'<td colspan="2" style="'+BD+'text-align:center;font-weight:700;padding:2px">'+pageNum+'/'+totalPages+'</td>'
     +'</tr>'
     +'<tr style="height:18px">'
@@ -7545,8 +7680,9 @@ function fillClientDatalist(){
   const sel=document.getElementById('o_client');
   if(sel&&sel.tagName==='SELECT'){
     const cur=sel.value;
+    // 목록에는 관리상호(약칭)만 표시 — 값(저장되는 거래처명)은 정식 업체명 그대로
     sel.innerHTML='<option value="">-- 거래처 선택 --</option>'+clients.filter(function(c){return c.is_sell;}).map(function(c){
-      return '<option value="'+c.name+'">'+(c.alias?c.name+' ('+c.alias+')':c.name)+'</option>';
+      return '<option value="'+_ddEsc(c.name)+'" title="'+_ddEsc(c.name)+'">'+_ddEsc(c.alias||c.name)+'</option>';
     }).join('');
     if(cur) sel.value=cur;
   }
@@ -7578,8 +7714,9 @@ function fillOrderProductDatalist(){
     if(client && filtered.length===0){
       sel.innerHTML='<option value="">-- 마스터에 등록된 품목 없음 --</option>';
     } else {
+      // 품명만 표시 (관리번호는 수주입력 목록에 보이지 않게)
       sel.innerHTML='<option value="">-- 품명 선택 --</option>'+filtered.map(function(m){
-        return '<option value="'+m.product+'">'+(m.code?'['+m.code+'] ':'')+m.product+'</option>';
+        return '<option value="'+_ddEsc(m.product)+'">'+_ddEsc(m.product)+'</option>';
       }).join('');
     }
   }
@@ -7611,7 +7748,7 @@ function openProductPicker(){
     const filtered=items.filter(function(m){return !q||m.product.indexOf(q)!==-1||(m.code&&m.code.indexOf(q)!==-1);});
     return filtered.map(function(m){
       return '<div onclick="selectProduct(\''+m.product.replace(/'/g,"\\'")+'\')" style="padding:13px 16px;border-bottom:1px solid #eee;font-size:14px;cursor:pointer;active:background:#f0f4ff">'
-        +(m.code?'<span style="font-size:10px;color:#888;margin-right:6px">['+m.code+']</span>':'')+m.product+'</div>';
+        +_ddEsc(m.product)+'</div>';
     }).join('')||'<div style="padding:16px;text-align:center;color:#999;font-size:13px">검색 결과 없음</div>';
   }
 
