@@ -1057,7 +1057,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.5</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.6</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -6127,8 +6127,9 @@ function renderDelivery(){
         ?'<button onclick="deliveryOutOne('+oi+')" style="padding:2px 7px;background:#BF360C;color:#fff;border:none;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;margin-right:2px">🚚</button>':'';
       var cancelBtn=(outQty>0&&!dLocked)
         ?'<button onclick="deliveryCancelOne('+oi+')" style="padding:2px 7px;background:#FFF8E1;color:#E65100;border:1px solid #FFCC02;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer">↩</button>':'';
-      var receiptBtn='<button onclick="printReceiptByOutNo(\''+sn+'\')" style="padding:2px 7px;background:#E8EAF6;color:#1A237E;border:none;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;margin-right:2px">🖨️</button>';
       var oc=o.client?o.client.replace(/'/g,"\\'"):'';
+      // 🖨 거래명세표: 이 행의 거래처 것만 (한 출고번호에 거래처가 섞여 있어도 눌린 거래처 명세표만)
+      var receiptBtn='<button onclick="printReceiptByOutNo(\''+sn+'\',\''+oc+'\')" title="'+(o.client||'')+' 거래명세표" style="padding:2px 7px;background:#E8EAF6;color:#1A237E;border:none;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;margin-right:2px">🖨️</button>';
       var op=o.product?o.product.replace(/'/g,"\\'"):'';
       var od=(o.due||'').replace(/'/g,"\\'");
       var hyunpumBtn2='<button onclick="printHyunpum(\''+oc+'\',\''+op+'\','+it.batchQty+',\''+od+'\',getMasterPalletQty(\''+op+'\',\''+oc+'\'),\''+String(o.num||'').replace(/'/g,"\\'")+'\')" style="padding:2px 7px;background:#F3E5F5;color:#6A1B9A;border:none;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;margin-right:2px">현품표</button>';
@@ -6963,11 +6964,17 @@ function printHyunpum(client, product, qty, due, palletQty, orderNum){
 }
 
 // ════ 출고번호 기반 명세서 출력 (같은 배치 전체) ════
-function printReceiptByOutNo(outNo){
+// onlyClient 가 있으면 그 거래처 품목만 (없으면 배치 전체 → 거래처별로 따로 문서)
+function printReceiptByOutNo(outNo, onlyClient){
   var deliveries=loadData('deliveries');
   var orders=loadData('orders');
   // deliveries에서 해당 출고번호 배치 레코드 필터
   var batch=deliveries.filter(function(d){return d.outNo===outNo;});
+  if(onlyClient){
+    var oc=String(onlyClient);
+    var filtered=batch.filter(function(d){ var o=orders.find(function(x){ return x.num===d.orderNum; }); return ((o&&o.client)||d.client||'')===oc; });
+    if(filtered.length) batch=filtered;
+  }
   var group=[];
   if(batch.length>0){
     // 신규 방식: deliveries 레코드에서 배치별 수량 직접 사용
@@ -6979,6 +6986,7 @@ function printReceiptByOutNo(outNo){
   } else {
     // 구버전 호환: deliveries가 없는 경우 orders.outNo로 폴백
     orders.forEach(function(o){
+      if(onlyClient&&(o.client||'')!==String(onlyClient)) return;
       var hist=o.outHistory||[];
       var entry=hist.find(function(h){return h.outNo===outNo;});
       if(entry){
