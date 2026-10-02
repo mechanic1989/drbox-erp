@@ -495,6 +495,25 @@ body.local-mode .main-panel{padding-bottom:44px!important} /* 하단 로컬모�
   .dyn-overlay div[style*="grid-template-columns:1fr 1fr 1fr"]{grid-template-columns:1fr 1fr!important}
   .dyn-overlay table{font-size:11px}
   .dyn-overlay div[style*="overflow-x:auto"] table,.dyn-overlay div[style*="overflow:auto"] table{min-width:560px}
+  /* 수량 확인·입력 팝업(발주·입고·출고): 제목/버튼은 고정, 가운데만 스크롤 · 표 대신 품목별 카드 (품목이 많아도 안 깨지게) */
+  .dyn-overlay > div.pop-fixed{max-height:calc(100vh - 12px)!important;overflow:hidden!important;display:flex;flex-direction:column}
+  @supports(height:100dvh){ .dyn-overlay > div.pop-fixed{max-height:calc(100dvh - 12px)!important} }
+  .pop-fixed [data-popup-body]{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1 1 auto;min-height:0}
+  .pop-fixed .pop-foot{flex-shrink:0;padding-top:8px;border-top:1px solid #eee}
+  .pop-fixed .pop-foot button{flex:1;padding:12px 8px!important;font-size:14px!important}
+  .resp-tbl{display:block;width:100%;margin-bottom:8px!important}
+  .resp-tbl thead{display:none}
+  .resp-tbl tbody{display:block;width:100%}
+  .resp-tbl tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 10px;border:1px solid #E3E6EC;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#FAFBFD}
+  .resp-tbl td{display:flex;align-items:center;gap:5px;border:none!important;padding:1px 0!important;font-size:12px!important;min-width:0;text-align:left!important}
+  .resp-tbl td[data-l]::before{content:attr(data-l);font-size:10px;color:#777;font-weight:600;white-space:nowrap}
+  .resp-tbl td.rt-title{display:block;flex-basis:100%;font-weight:700;font-size:13px!important;line-height:1.3;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;color:#222}
+  .resp-tbl td.rt-client{flex-basis:100%;font-size:11px!important;color:#555}
+  .resp-tbl td.rt-input{flex-basis:100%;margin-top:3px;flex-wrap:wrap}
+  .resp-tbl td.rt-input input{flex:1 1 auto;width:auto!important;min-width:0;min-height:38px;font-size:15px!important}
+  .resp-tbl td.rt-input > div{flex-basis:100%;margin-top:2px}
+  .resp-tbl tr.rt-sub{background:#E8F5E9;border-color:#A5D6A7}
+  .resp-tbl tr.rt-sub td{display:block;width:100%;flex-basis:100%}
 }
 /* ── 통합 검색 ── */
 .gs-wrap{position:relative;flex:1 1 320px;max-width:520px;min-width:180px;margin:0 8px}
@@ -1060,7 +1079,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.8</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.9</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -6423,14 +6442,14 @@ function _showDeliveryPopup(targets, orders, stocks){
     const maxOut=Math.max(0,stockedQty-outQty);
     rows+=
       '<tr>'
-      +'<td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px">'+o.client+'</td>'
-      +'<td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:left">'+o.product+'</td>'
-      +'<td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center">'+totalQty.toLocaleString()+'</td>'
-      +'<td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#1565C0">'+outQty.toLocaleString()+'</td>'
-      +'<td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#2E7D32">'+stockedQty.toLocaleString()+'</td>'
-      +'<td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#E65100">'+remain.toLocaleString()+'</td>'
-      +'<td style="padding:8px 6px;border-bottom:1px solid #eee">'
-        +'<input type="number" id="del_qty_'+i+'" value="'+maxOut+'" min="0" max="'+maxOut+'"'
+      +'<td class="rt-client" data-l="거래처" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px">'+_ddEsc(o.client)+'</td>'
+      +'<td class="rt-title" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:left">'+_ddEsc(o.product)+'</td>'
+      +'<td data-l="수량" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center">'+totalQty.toLocaleString()+'</td>'
+      +'<td data-l="기출고" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#1565C0">'+outQty.toLocaleString()+'</td>'
+      +'<td data-l="입고완료" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#2E7D32">'+stockedQty.toLocaleString()+'</td>'
+      +'<td data-l="잔여" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#E65100">'+remain.toLocaleString()+'</td>'
+      +'<td class="rt-input" data-l="출고수량" style="padding:8px 6px;border-bottom:1px solid #eee">'
+        +'<input type="number" id="del_qty_'+i+'" value="'+maxOut+'" min="0" max="'+maxOut+'" inputmode="numeric"'
         +' oninput="_calcDelivVehicle()"'
         +' style="width:90px;padding:5px 8px;border:2px solid #BF360C;border-radius:5px;font-size:12px;font-weight:700;text-align:right">'
         +(maxOut<=0?'<div style="font-size:9px;color:#C62828;margin-top:2px">입고수량 부족</div>':'')
@@ -6438,7 +6457,7 @@ function _showDeliveryPopup(targets, orders, stocks){
       +'</tr>';
     // 미연동 개발비 있으면 바로 아래 표시
     if(pendingDevCosts[i]&&pendingDevCosts[i].length>0){
-      rows+='<tr><td colspan="7" style="padding:6px 12px;background:#E8F5E9;border-bottom:2px solid #A5D6A7">'
+      rows+='<tr class="rt-sub"><td colspan="7" style="padding:6px 12px;background:#E8F5E9;border-bottom:2px solid #A5D6A7">'
         +'<div style="font-size:11px;font-weight:700;color:#2E7D32;margin-bottom:4px">💰 연동 가능한 개발비 ('+o.client+' / '+o.product+')</div>';
       pendingDevCosts[i].forEach(function(dc){
         var billedLabel=dc.billed
@@ -6462,12 +6481,13 @@ function _showDeliveryPopup(targets, orders, stocks){
   if(_clientSet.length>1) devCostNote+='<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#795548">🏷️ 거래처 '+_clientSet.length+'곳('+_clientSet.map(function(c){ return String(c).replace(/</g,'&lt;'); }).join(', ')+')이 함께 선택되어 <b>출고번호가 거래처별로 따로</b> 매겨지고 거래명세표도 거래처별로 나옵니다. 운반비는 출고 수량 비율로 나눠 기록됩니다.</div>';
 
   overlay.innerHTML=''
-    +'<div style="background:#fff;border-radius:12px;padding:24px;min-width:640px;max-width:92vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3)">'
-      +'<div style="font-size:15px;font-weight:700;color:#BF360C;margin-bottom:8px">🚚 출고 수량 입력</div>'
+    +'<div class="pop-fixed" style="background:#fff;border-radius:12px;padding:20px 24px;min-width:640px;max-width:92vw;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3)">'
+      +'<div style="font-size:15px;font-weight:700;color:#BF360C;margin-bottom:8px;flex-shrink:0">🚚 출고 수량 입력 <span style="font-size:11px;color:#888;font-weight:400">· '+targets.length+'건</span></div>'
+      +'<div data-popup-body style="overflow-y:auto;flex:1 1 auto;min-height:0">'
       +devCostNote
       +'<div style="font-size:11px;color:#666;margin-bottom:10px">※ 출고수량은 입고완료 수량을 초과할 수 없습니다.</div>'
       +'<div id="del_viz_wrap" style="margin-bottom:12px"></div>'
-      +'<table style="width:100%;border-collapse:collapse;margin-bottom:16px">'
+      +'<table class="resp-tbl" style="width:100%;border-collapse:collapse;margin-bottom:16px">'
         +'<thead><tr style="background:#BF360C;color:#fff">'
           +'<th style="padding:8px 6px;font-size:11px">거래처</th>'
           +'<th style="padding:8px 6px;font-size:11px;text-align:left">품명</th>'
@@ -6489,7 +6509,8 @@ function _showDeliveryPopup(targets, orders, stocks){
         +'</div>'
         +'<div id="del_vehicle_wrap" style="display:flex;gap:8px;align-items:stretch;flex-wrap:wrap"></div>'
       +'</div>'
-      +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'
+      +'</div>'
+      +'<div class="pop-foot" style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;flex-shrink:0">'
         +'<button id="del_out_cancel" style="padding:9px 20px;background:#888;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">취소</button>'
         +'<button id="del_out_ok" style="padding:9px 20px;background:#BF360C;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">🚚 출고처리</button>'
       +'</div>'
@@ -8698,21 +8719,22 @@ function printPO(){
     const maxQty=+p.qty||0;
     const remaining=maxQty-(+p.issuedQty||0);
     rows+=`<tr>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px">${p.product||'-'}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center">${maxQty.toLocaleString()}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#E65100">${remaining.toLocaleString()}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee">
-        <input type="number" id="po_split_qty_${i}" value="${remaining}" min="1" max="${maxQty}"
+      <td class="rt-title" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px">${_ddEsc(p.product||'-')}</td>
+      <td data-l="전체" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center">${maxQty.toLocaleString()}</td>
+      <td data-l="잔여" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#E65100">${remaining.toLocaleString()}</td>
+      <td class="rt-input" data-l="발주수량" style="padding:8px 6px;border-bottom:1px solid #eee">
+        <input type="number" id="po_split_qty_${i}" value="${remaining}" min="1" max="${maxQty}" inputmode="numeric"
           style="width:90px;padding:5px 8px;border:2px solid #3949AB;border-radius:5px;font-size:12px;font-weight:700;text-align:right">
       </td>
     </tr>`;
   });
 
   overlay.innerHTML=`
-    <div style="background:#fff;border-radius:12px;padding:24px;min-width:520px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
-      <div style="font-size:15px;font-weight:700;color:#1A237E;margin-bottom:16px">📋 발주 수량 확인</div>
+    <div class="pop-fixed" style="background:#fff;border-radius:12px;padding:20px 24px;min-width:520px;max-width:90vw;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+      <div style="font-size:15px;font-weight:700;color:#1A237E;margin-bottom:12px;flex-shrink:0">📋 발주 수량 확인 <span style="font-size:11px;color:#888;font-weight:400">· ${selected.length}건 · ${_ddEsc(vendors[0])}</span></div>
+      <div data-popup-body style="overflow-y:auto;flex:1 1 auto;min-height:0">
       <div style="font-size:11px;color:#666;margin-bottom:12px">※ 이번에 발주할 수량을 입력하세요. 나머지는 잔량으로 남습니다.</div>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      <table class="resp-tbl" style="width:100%;border-collapse:collapse;margin-bottom:16px">
         <thead>
           <tr style="background:#1A237E;color:#fff">
             <th style="padding:8px 6px;font-size:11px;text-align:left">품명</th>
@@ -8723,7 +8745,8 @@ function printPO(){
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="display:flex;justify-content:flex-end;gap:8px">
+      </div>
+      <div class="pop-foot" style="display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;margin-top:4px">
         <button id="po_split_cancel" style="padding:9px 20px;background:#888;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">취소</button>
         <button id="po_split_ok" style="padding:9px 20px;background:#1A237E;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">✅ 발주서 출력</button>
       </div>
@@ -9098,12 +9121,12 @@ function _showStockPopup(targets, stocks){
     const remaining=Math.max(0,poQty-receivedQty);
     const expectedVendor=linkedPO?(linkedPO.vendor||''):'';
     rows+=`<tr>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px">${s.client||'-'}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:left">${s.product||'-'}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#1565C0;font-weight:600">${expectedVendor||'<span style="color:#bbb">미지정</span>'}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee">
-        <input type="text" id="stk_vendor_${i}" value="${expectedVendor}" placeholder="입고처 입력"
-          data-expected="${expectedVendor}"
+      <td class="rt-client" data-l="거래처" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px">${_ddEsc(s.client||'-')}</td>
+      <td class="rt-title" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:left">${_ddEsc(s.product||'-')}</td>
+      <td data-l="발주처" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#1565C0;font-weight:600">${_ddEsc(expectedVendor)||'<span style="color:#bbb">미지정</span>'}</td>
+      <td class="rt-input" data-l="입고처" style="padding:8px 6px;border-bottom:1px solid #eee">
+        <input type="text" id="stk_vendor_${i}" value="${_ddEsc(expectedVendor)}" placeholder="입고처 입력"
+          data-expected="${_ddEsc(expectedVendor)}"
           oninput="
             var v=this.value.trim(), ex=this.getAttribute('data-expected').trim();
             var errEl=document.getElementById('stk_vendor_err_${i}');
@@ -9118,10 +9141,10 @@ function _showStockPopup(targets, stocks){
           style="width:130px;padding:5px 8px;border:2px solid #00695C;border-radius:5px;font-size:12px">
         <div id="stk_vendor_err_${i}" style="display:none;color:#E53935;font-size:10px;margin-top:2px;font-weight:700"></div>
       </td>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;font-weight:600">${poQty.toLocaleString()}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#E65100">${remaining.toLocaleString()}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #eee">
-        <input type="number" id="stk_qty_${i}" value="${remaining}" min="1" max="${poQty}"
+      <td data-l="발주수량" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;font-weight:600">${poQty.toLocaleString()}</td>
+      <td data-l="잔여" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#E65100">${remaining.toLocaleString()}</td>
+      <td class="rt-input" data-l="입고수량" style="padding:8px 6px;border-bottom:1px solid #eee">
+        <input type="number" id="stk_qty_${i}" value="${remaining}" min="1" max="${poQty}" inputmode="numeric"
           data-poqty="${poQty}"
           style="width:90px;padding:5px 8px;border:2px solid #00695C;border-radius:5px;font-size:12px;font-weight:700;text-align:right">
       </td>
@@ -9129,10 +9152,11 @@ function _showStockPopup(targets, stocks){
   });
 
   overlay.innerHTML=`
-    <div style="background:#fff;border-radius:12px;padding:24px;min-width:640px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
-      <div style="font-size:15px;font-weight:700;color:#00695C;margin-bottom:16px">📦 입고 수량 확인</div>
+    <div class="pop-fixed" style="background:#fff;border-radius:12px;padding:20px 24px;min-width:640px;max-width:92vw;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+      <div style="font-size:15px;font-weight:700;color:#00695C;margin-bottom:12px;flex-shrink:0">📦 입고 수량 확인 <span style="font-size:11px;color:#888;font-weight:400">· ${targets.length}건</span></div>
+      <div data-popup-body style="overflow-y:auto;flex:1 1 auto;min-height:0">
       <div style="font-size:11px;color:#666;margin-bottom:12px">※ 입고처가 발주처와 다를 경우 경고가 표시됩니다. 수량을 확인 후 입고처리하세요.</div>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      <table class="resp-tbl" style="width:100%;border-collapse:collapse;margin-bottom:16px">
         <thead>
           <tr style="background:#00695C;color:#fff">
             <th style="padding:8px 6px;font-size:11px">거래처</th>
@@ -9147,7 +9171,8 @@ function _showStockPopup(targets, stocks){
         <tbody>${rows}</tbody>
       </table>
       <div id="stk_vendor_block_err" style="display:none;background:#FFF3E0;border:1px solid #FF8F00;border-radius:6px;padding:10px 14px;margin-bottom:12px;color:#E65100;font-size:12px;font-weight:700"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px">
+      </div>
+      <div class="pop-foot" style="display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;margin-top:4px">
         <button id="stk_cancel" style="padding:9px 20px;background:#888;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">취소</button>
         <button id="stk_ok" style="padding:9px 20px;background:#00695C;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">✅ 입고처리</button>
       </div>
@@ -13930,7 +13955,9 @@ function _drawTruckViz(container, veh, packed, allPallets, totalL){
   }
   // 치수
   parts.push('<text x="'+(dL/2)+'" y="'+(dW+13)+'" text-anchor="middle" font-size="9" fill="#546E7A" font-weight="600">← '+truckL.toLocaleString()+'mm →</text>');
-  var svg='<svg width="'+(dL+4)+'" height="'+(dW+18)+'" style="overflow:visible;display:block;max-width:100%">'+parts.join('')+'</svg>';
+  // 초과 적재로 그림이 트럭보다 길어져도 화면(폰) 폭에 맞게 줄어들도록 viewBox 사용
+  var fullW=Math.max(dL+4,xCursor+4), fullH=dW+18;
+  var svg='<svg viewBox="0 0 '+fullW+' '+fullH+'" width="'+fullW+'" height="'+fullH+'" style="display:block;max-width:100%;height:auto">'+parts.join('')+'</svg>';
   // 범례
   var seen={}, legendHtml='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">';
   allPallets.forEach(function(p){
@@ -16078,15 +16105,18 @@ function renderDeliveryCalendar(orders, todayStr, defaultYm){
   var ym=window._calYm;
   var year=+ym.slice(0,4), month=+ym.slice(5,7);
 
-  // 해당 월의 납품 due 날짜 → 거래처 매핑
-  var dueMap={};
+  // 해당 월의 납품 due 날짜 → 거래처 매핑 (칩에는 관리상호, 누르면 품목·수량 상세)
+  var dueMap={}, dueCnt={};
   orders.forEach(function(o){
     if(!o.due||!o.client) return;
     if(o.due.slice(0,7)!==ym) return;
     if(o.status==='출고완료') return; // 완료건은 표시 안 함
     if(!dueMap[o.due]) dueMap[o.due]=[];
     if(dueMap[o.due].indexOf(o.client)===-1) dueMap[o.due].push(o.client);
+    dueCnt[o.due]=(dueCnt[o.due]||0)+1;
   });
+  var _clients=loadData('clients'), _aliasOf={};
+  _clients.forEach(function(c){ if(c&&c.name) _aliasOf[c.name]=c.alias||''; });
 
   // 달력 계산
   var firstDay=new Date(year,month-1,1).getDay(); // 0=일
@@ -16129,14 +16159,15 @@ function renderDeliveryCalendar(orders, todayStr, defaultYm){
       var dayColor=wi===0?'#C62828':wi===6?'#1565C0':'#333';
       var cellBg=isToday?'#E3F2FD':hasDue?'#FFF9C4':'#FFF';
       var border=isToday?'2px solid #1976D2':'1px solid #EEEEF2';
-      html+='<td style="border:'+border+';height:56px;vertical-align:top;padding:3px 4px;background:'+cellBg+';position:relative">';
-      html+='<div style="font-size:11px;font-weight:'+(isToday?'800':'600')+';color:'+(isToday?'#1565C0':dayColor)+';margin-bottom:2px">'+day+(isToday?' ●':'')+'</div>';
+      html+='<td data-date="'+dateStr+'" style="border:'+border+';height:56px;vertical-align:top;padding:3px 4px;background:'+cellBg+';position:relative'+(hasDue?';cursor:pointer':'')+'"'+(hasDue?' onclick="openCalDay(this.getAttribute(\'data-date\'))" title="누르면 이날 납품 품목·수량 보기"':'')+'>';
+      html+='<div style="font-size:11px;font-weight:'+(isToday?'800':'600')+';color:'+(isToday?'#1565C0':dayColor)+';margin-bottom:2px">'+day+(isToday?' ●':'')+(hasDue?'<span style="font-size:9px;color:#888;font-weight:400;margin-left:3px">'+dueCnt[dateStr]+'건</span>':'')+'</div>';
       if(hasDue){
         dueMap[dateStr].slice(0,3).forEach(function(cl){
-          html+='<div style="background:#1F4E79;color:#fff;font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%" title="'+cl+'">'+cl+'</div>';
+          var lbl=_aliasOf[cl]||cl;
+          html+='<div data-cal-client="'+_ddEsc(cl)+'" onclick="event.stopPropagation();openCalDay(this.closest(\'td\').getAttribute(\'data-date\'),this.getAttribute(\'data-cal-client\'))" style="background:#1F4E79;color:#fff;font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;cursor:pointer" title="'+_ddEsc(cl)+' — 누르면 품목·수량 보기">'+_ddEsc(lbl)+'</div>';
         });
         if(dueMap[dateStr].length>3){
-          html+='<div style="font-size:9px;color:#888;margin-top:1px">+' +(dueMap[dateStr].length-3)+'건</div>';
+          html+='<div style="font-size:9px;color:#888;margin-top:1px">+' +(dueMap[dateStr].length-3)+'곳 더</div>';
         }
       }
       html+='</td>';
@@ -16147,10 +16178,68 @@ function renderDeliveryCalendar(orders, todayStr, defaultYm){
   calEl.innerHTML=html;
 }
 
+// 캘린더 날짜/거래처 클릭 → 그날 납품 품목·수량 상세 (hlClient: 누른 거래처를 맨 위에 강조)
+function openCalDay(dateStr, hlClient){
+  if(!dateStr) return;
+  var orders=loadData('orders').filter(function(o){ return o&&o.due===dateStr&&o.client&&o.status!=='출고완료'; });
+  if(!orders.length) return;
+  var clients=loadData('clients'), aliasOf={};
+  clients.forEach(function(c){ if(c&&c.name) aliasOf[c.name]=c.alias||''; });
+  var groups=[];
+  orders.forEach(function(o){ var g=groups.find(function(x){ return x.client===o.client; }); if(!g){ g={client:o.client,items:[],qty:0,remain:0}; groups.push(g); } g.items.push(o); g.qty+=(+o.qty||0); g.remain+=Math.max(0,(+o.qty||0)-(+o.outQty||0)); });
+  if(hlClient){ groups.sort(function(a,b){ return (a.client===hlClient?0:1)-(b.client===hlClient?0:1); }); }
+  var d=new Date(dateStr+'T00:00:00'); var dow=['일','월','화','수','목','금','토'][d.getDay()];
+  var tStr=today(); var diff=Math.round((new Date(dateStr+'T00:00:00')-new Date(tStr+'T00:00:00'))/86400000);
+  var dBadge=diff===0?'<span style="background:#1976D2;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:6px">오늘</span>':diff<0?'<span style="background:#C62828;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:6px">'+(-diff)+'일 지남</span>':'<span style="background:#E8F5E9;color:#2E7D32;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:6px">D-'+diff+'</span>';
+  var stBg={'접수':'#ECEFF1','생산중':'#FFF3E0','입고완료':'#E8F5E9','출고중':'#E3F2FD','부분출고':'#E3F2FD'};
+  var old=document.getElementById('cal_day_overlay'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='cal_day_overlay'; ov.className='dyn-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:10px';
+  var total=orders.length, totalQty=orders.reduce(function(a,o){ return a+(+o.qty||0); },0);
+  var body=groups.map(function(g){
+    var hl=(hlClient&&g.client===hlClient);
+    var rows=g.items.map(function(o){
+      var qty=+o.qty||0, out=+o.outQty||0, remain=Math.max(0,qty-out);
+      return '<div data-cal-row style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #F0F0F0">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:13px;font-weight:700;color:#222;line-height:1.3;word-break:keep-all;overflow-wrap:anywhere">'+_ddEsc(o.product||'-')+'</div>'
+          +'<div style="font-size:10px;color:#777;margin-top:2px">'+_ddEsc(o.num||'')+(o.dest?' · 납품처 '+_ddEsc(o.dest):'')+(o.status?' · <span style="background:'+(stBg[o.status]||'#ECEFF1')+';padding:0 5px;border-radius:3px">'+_ddEsc(o.status)+'</span>':'')+'</div>'
+        +'</div>'
+        +'<div style="text-align:right;white-space:nowrap">'
+          +'<div style="font-size:14px;font-weight:800;color:#1F4E79">'+qty.toLocaleString()+'<span style="font-size:10px;font-weight:400;color:#777"> 매</span></div>'
+          +(out>0?'<div style="font-size:10px;color:#E65100">출고 '+out.toLocaleString()+' · 남은 '+remain.toLocaleString()+'</div>':'')
+        +'</div>'
+      +'</div>';
+    }).join('');
+    return '<div data-cal-group="'+_ddEsc(g.client)+'" data-cal-hl="'+(hl?'1':'0')+'" style="border:1.5px solid '+(hl?'#1F4E79':'#E0E4EA')+';border-radius:10px;padding:8px 12px;margin-bottom:8px;background:'+(hl?'#F3F7FC':'#fff')+'">'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:800;color:#1F4E79">🏢 '+_ddEsc(aliasOf[g.client]||g.client)+'</span>'
+        +(aliasOf[g.client]?'<span style="font-size:10px;color:#888">'+_ddEsc(g.client)+'</span>':'')
+        +'<span style="margin-left:auto;font-size:11px;color:#555">'+g.items.length+'품목 · <b>'+g.qty.toLocaleString()+'매</b></span>'
+      +'</div>'
+      +rows
+    +'</div>';
+  }).join('');
+  ov.innerHTML='<div class="pop-fixed" style="background:#fff;border-radius:12px;width:100%;max-width:520px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3);padding:16px 18px">'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-shrink:0">'
+      +'<div style="flex:1;font-size:15px;font-weight:700;color:#1F4E79">📅 '+dateStr.slice(5).replace('-','/')+' ('+dow+') 납품 일정'+dBadge+'</div>'
+      +'<button onclick="document.getElementById(\'cal_day_overlay\').remove()" style="padding:4px 10px;background:#eee;border:none;border-radius:6px;font-size:14px;cursor:pointer">✕</button>'
+    +'</div>'
+    +'<div style="font-size:11px;color:#666;margin-bottom:8px;flex-shrink:0">거래처 '+groups.length+'곳 · '+total+'건 · 총 '+totalQty.toLocaleString()+'매'+(hlClient?' — 누른 거래처를 맨 위에 표시':'')+'</div>'
+    +'<div data-popup-body style="overflow-y:auto;flex:1 1 auto;min-height:0">'+body+'</div>'
+    +'<div class="pop-foot" style="display:flex;gap:8px;margin-top:10px;flex-shrink:0">'
+      +'<button onclick="document.getElementById(\'cal_day_overlay\').remove();switchTab(\'tab_delivery\')" style="flex:1;padding:10px;background:#1F4E79;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📋 납기관리로 이동</button>'
+      +'<button onclick="document.getElementById(\'cal_day_overlay\').remove()" style="padding:10px 16px;background:#eee;color:#333;border:none;border-radius:8px;font-size:13px;cursor:pointer">닫기</button>'
+    +'</div>'
+  +'</div>';
+  ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+
 function calMove(dir){
   if(!window._calYm) window._calYm=today();
   var y=+window._calYm.slice(0,4), m=+window._calYm.slice(5,7);
-  if(dir===0){ window._calYm=new Date().toISOString().slice(0,7); }
+  if(dir===0){ window._calYm=today().slice(0,7); }
   else {
     m+=dir;
     if(m>12){m=1;y++;}
