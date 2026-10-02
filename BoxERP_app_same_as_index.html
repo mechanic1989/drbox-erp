@@ -795,6 +795,7 @@ function startLocalMode(){
     try{ if(typeof migrateRecordIds==='function') migrateRecordIds(); }catch(e){}
     try{ if(typeof invalidateIdx==='function') invalidateIdx(); renderAll(); if(typeof fillClientDatalist==='function') fillClientDatalist(); } catch(e){}
     var _home=document.getElementById('tab_home'); if(_home&&_home.style.display!=='none'&&typeof renderDashboard==='function'){ try{ renderDashboard(); }catch(e){} }
+    setTimeout(function(){ try{ if(typeof splitMixedOutNos==='function') splitMixedOutNos(); }catch(e){ console.warn('splitMixedOutNos',e); } },300);
     if(typeof scheduleAutoSnapshot==='function') scheduleAutoSnapshot(5000);
     if(typeof scheduleBriefingPopup==='function') scheduleBriefingPopup(1200);
     if(typeof processPendingScan==='function') processPendingScan();
@@ -968,6 +969,8 @@ if(fbReady){
                 try{ var v=(typeof loadData==='function')?loadData(k):JSON.parse(store.getItem(k)||'[]'); if(Array.isArray(v)&&v.length){ ensureIds(v); store.setItem(k,JSON.stringify(v)); fbSave(k,v); } }catch(e){ console.warn('pending save',k,e); }
               });
               if(typeof window.__onFbSyncReady==='function') try{ window.__onFbSyncReady(); }catch(e){}
+              // 클라우드 데이터가 모두 내려온 뒤: 거래처가 섞인 예전 출고번호 정리 (할 게 없으면 아무것도 안 함)
+              setTimeout(function(){ try{ if(typeof splitMixedOutNos==='function') splitMixedOutNos(); }catch(e){ console.warn('splitMixedOutNos',e); } },800);
             };
             REC_KEYS.forEach(function(key){
               fbDb.ref(root+'/rec/'+key).on('value', function(snap){
@@ -1057,7 +1060,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.6</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.7</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -4530,10 +4533,11 @@ function showInfoToast(msg,color,action){
   var el=document.createElement('div');
   el.className='info-toast';
   el.style.cssText='background:'+(color||'#1F4E79')+';color:#fff;padding:10px 12px;border-radius:8px;font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,0.3);display:flex;gap:10px;align-items:center;line-height:1.4';
+  var hasBtn=!!(action&&typeof action.fn==='function');
   el.innerHTML='<div style="flex:1;min-width:0;word-break:break-all">'+String(msg).replace(/</g,'&lt;')+'</div>'
-    +(action?'<button class="toast-action" style="background:#fff;color:'+(color||'#1F4E79')+';border:none;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">'+String(action.label||'실행').replace(/</g,'&lt;')+'</button>':'')
+    +(hasBtn?'<button class="toast-action" style="background:#fff;color:'+(color||'#1F4E79')+';border:none;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">'+String(action.label||'실행').replace(/</g,'&lt;')+'</button>':'')
     +'<button style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:0 2px" onclick="this.parentElement.remove()">✕</button>';
-  if(action){ el.querySelector('.toast-action').onclick=function(){ try{ action.fn(); }catch(e){ console.warn(e); } el.remove(); }; }
+  if(hasBtn){ el.querySelector('.toast-action').onclick=function(){ try{ action.fn(); }catch(e){ console.warn(e); } el.remove(); }; }
   host.appendChild(el);
   while(host.children.length>3) host.removeChild(host.firstChild);
   setTimeout(function(){ if(el.parentElement) el.remove(); },(action&&action.ms)||6000);
@@ -6856,28 +6860,63 @@ function saveEditDevCost(dcId){
   alert('✅ 개발비가 수정되었습니다.');
 }
 
-// ════ 입고번호 생성 ════
+// ════ 입고·출고번호 생성 ════
+//  이 기기의 카운터(localStorage)와 저장된 데이터의 최대 번호 중 큰 값 +1 → 다른 기기(폰·PC)에서 같은 날 만든 번호와 겹치지 않음
+function _todayDs(){ var now=new Date(); return now.getFullYear()+''+(('0'+(now.getMonth()+1)).slice(-2))+(('0'+now.getDate()).slice(-2)); }
+function _maxSeqInData(prefix,ds,lists){
+  var max=0, re=new RegExp('^'+prefix+'-'+ds+'-(\\d+)$');
+  lists.forEach(function(l){ var arr=l.arr, field=l.field; if(!Array.isArray(arr)) return; arr.forEach(function(r){ var m=r&&re.exec(String(r[field]||'')); if(m&&+m[1]>max) max=+m[1]; }); });
+  return max;
+}
 function generateInNo(){
-  var now=new Date();
-  var ds=now.getFullYear()+''
-    +(('0'+(now.getMonth()+1)).slice(-2))
-    +(('0'+now.getDate()).slice(-2));
-  var key='inNoSeq_'+ds;
-  var seq=(parseInt(store.getItem(key)||'0'))+1;
-  store.setItem(key,String(seq));
+  var ds=_todayDs(), key='inNoSeq_'+ds;
+  var seq=parseInt(store.getItem(key)||'0')||0;
+  try{ seq=Math.max(seq,_maxSeqInData('IN',ds,[{arr:loadData('stocks'),field:'inNo'}])); }catch(e){}
+  seq+=1; store.setItem(key,String(seq));
   return 'IN-'+ds+'-'+(('000'+seq).slice(-3));
 }
-
-// ════ 출고번호 생성 ════
 function generateOutNo(){
-  var now=new Date();
-  var ds=now.getFullYear()+''
-    +(('0'+(now.getMonth()+1)).slice(-2))
-    +(('0'+now.getDate()).slice(-2));
-  var key='outNoSeq_'+ds;
-  var seq=(parseInt(store.getItem(key)||'0'))+1;
-  store.setItem(key,String(seq));
+  var ds=_todayDs(), key='outNoSeq_'+ds;
+  var seq=parseInt(store.getItem(key)||'0')||0;
+  try{ seq=Math.max(seq,_maxSeqInData('OUT',ds,[{arr:loadData('deliveries'),field:'outNo'},{arr:loadData('orders'),field:'outNo'}])); }catch(e){}
+  seq+=1; store.setItem(key,String(seq));
   return 'OUT-'+ds+'-'+(('000'+seq).slice(-3));
+}
+// ════ 거래처가 섞인 출고번호 정리 (예전 출고 데이터) ════
+//  한 출고번호에 거래처가 여러 곳이면 거래명세표도 섞이므로, 첫 거래처는 기존 번호를 유지하고 나머지 거래처에는 그날의 다음 번호를 새로 부여
+//  (출고 기록·수주의 출고번호·연동 개발비 함께 변경 · 변경이력에 기록 · 시작 때 자동 실행, 할 게 없으면 아무것도 안 함)
+function splitMixedOutNos(){
+  if(typeof fbCanWrite==='function'&&!fbCanWrite()) return 0;
+  var deliveries=loadData('deliveries'); if(!Array.isArray(deliveries)||!deliveries.length) return 0;
+  var orders=loadData('orders'), devCosts=loadData('devCosts');
+  var byNum={}; orders.forEach(function(o){ if(o&&o.num) byNum[o.num]=o; });
+  var clientOf=function(d){ var o=byNum[d.orderNum]; return ((o&&o.client)||d.client||''); };
+  var parse=function(no){ var m=/^OUT-(\d{8})-(\d+)$/.exec(String(no||'')); return m?{ds:m[1],seq:+m[2]}:null; };
+  var byNo={}; deliveries.forEach(function(d){ if(!d||!d.outNo) return; (byNo[d.outNo]=byNo[d.outNo]||[]).push(d); });
+  var usedSeq={};
+  Object.keys(byNo).forEach(function(no){ var p=parse(no); if(p) usedSeq[p.ds]=Math.max(usedSeq[p.ds]||0,p.seq); });
+  orders.forEach(function(o){ var p=parse(o&&o.outNo); if(p) usedSeq[p.ds]=Math.max(usedSeq[p.ds]||0,p.seq); });
+  var changes=[];
+  Object.keys(byNo).sort().forEach(function(no){
+    var recs=byNo[no], clients=[];
+    recs.forEach(function(d){ var c=clientOf(d); if(clients.indexOf(c)===-1) clients.push(c); });
+    if(clients.length<=1) return;
+    var p=parse(no); if(!p) return;
+    clients.slice(1).forEach(function(c){
+      usedSeq[p.ds]=(usedSeq[p.ds]||0)+1;
+      var newNo='OUT-'+p.ds+'-'+('000'+usedSeq[p.ds]).slice(-3);
+      recs.forEach(function(d){ if(clientOf(d)===c) d.outNo=newNo; });
+      orders.forEach(function(o){ if(o&&o.outNo===no&&(o.client||'')===c) o.outNo=newNo; });
+      devCosts.forEach(function(dc){ if(dc&&dc.linkedOutNo===no&&(dc.client||'')===c) dc.linkedOutNo=newNo; });
+      changes.push({oldNo:no,newNo:newNo,client:c});
+    });
+  });
+  if(!changes.length) return 0;
+  saveData('deliveries',deliveries); saveData('orders',orders); saveData('devCosts',devCosts);
+  Object.keys(usedSeq).forEach(function(ds){ var key='outNoSeq_'+ds; if((parseInt(store.getItem(key)||'0')||0)<usedSeq[ds]) store.setItem(key,String(usedSeq[ds])); });
+  try{ showInfoToast('🏷️ 거래처가 섞여 있던 출고번호를 거래처별로 나눴습니다 ('+changes.length+'건): '+changes.map(function(c){ return c.client+' '+c.oldNo+' → '+c.newNo; }).join(' · '),'#1F4E79',{ms:15000}); }catch(e){}
+  try{ if(typeof _fbRenderAfterSync==='function'){ _fbRenderAfterSync('deliveries'); _fbRenderAfterSync('orders'); } }catch(e){}
+  return changes.length;
 }
 
 // ════ 현품표 출력 ════
