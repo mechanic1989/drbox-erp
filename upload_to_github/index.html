@@ -1079,7 +1079,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.10</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.11</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -7746,7 +7746,11 @@ function fillDestFromClient(){
   const name=document.getElementById('o_client')?.value||'';
   const clients=loadData('clients');
   const found=clients.find(function(c){return c.name===name;});
-  if(found&&found.alias) document.getElementById('o_dest').value=found.alias;
+  const destEl=document.getElementById('o_dest');
+  if(!destEl){ fillOrderProductDatalist(); return; }
+  if(found&&found.alias){ destEl.value=found.alias; destEl.dataset.auto=found.alias; }
+  // 관리상호가 없는 거래처로 바꾼 경우: 앞서 자동으로 들어간 다른 거래처의 관리상호가 그대로 남지 않게 비움 (직접 입력한 납품처는 그대로 둠)
+  else if(destEl.dataset.auto&&destEl.value===destEl.dataset.auto){ destEl.value=''; delete destEl.dataset.auto; }
   fillOrderProductDatalist();
 }
 
@@ -7925,8 +7929,10 @@ function fillOrderFromProduct(){
 }
 
 // ════ 수주 모달 ════
-function openOrderModal(idx=-1){
+//  keep: {date,client,due} — '저장 후 계속 입력'으로 다시 열릴 때만 넘어옴 (새로 열거나 수정할 때는 없음)
+function openOrderModal(idx=-1,keep){
   document.getElementById('o_edit_idx').value=idx; rememberEditId('orders',idx);
+  { const de0=document.getElementById('o_dest'); if(de0) delete de0.dataset.auto; }
   const lockStyle='#F0F0F0',lockColor='#888';
   function unlock(){
     ['order_paper','o_jang','o_pok','o_go'].forEach(function(id){
@@ -7946,9 +7952,23 @@ function openOrderModal(idx=-1){
     ['o_jeonj','o_jeonp','o_rp','o_nalgae','o_jeolsu','o_area'].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
     document.getElementById('o_flute').value='A골';
     document.getElementById('o_due').value='';
+    // 직전 품목의 1P/T 수량·인쇄사양서 표시가 빈 입력 창에 남지 않게
+    { const pq0=document.getElementById('o_pallet_qty'); if(pq0) pq0.value=''; }
+    _updateOrderSpecPanel(null);
     unlock();
     fillClientDatalist();
     fillOrderProductDatalist();
+    if(keep){
+      // 연속 입력: 직전 수주의 수주일자·거래처·납기일 유지
+      if(keep.date) document.getElementById('o_date').value=keep.date;
+      if(keep.client){
+        const cs=document.getElementById('o_client');
+        cs.value=keep.client;
+        // 거래처를 직접 고른 것과 똑같이: 납품처 기본값(관리상호) + 그 거래처 품목만 목록에
+        if(cs.value===keep.client) fillDestFromClient(); else cs.value='';
+      }
+      if(keep.due) document.getElementById('o_due').value=keep.due;
+    }
   } else {
     const o=loadData('orders')[idx];
     fillClientDatalist();
@@ -8067,8 +8087,8 @@ function saveOrder(){
   saveData('orders',orders);
   renderAll();
   if(idx===-1){
-    // 신규 저장 후 연속 입력: 모달 다시 열기
-    openOrderModal(-1);
+    // 신규 저장 후 연속 입력: 모달 다시 열기 — 수주일자·거래처·납기일은 방금 입력한 값 그대로 (같은 거래처 품목을 이어서 넣기 쉽게)
+    openOrderModal(-1,{date:data.date,client:data.client,due:data.due});
   } else {
     // 수정 저장 후 닫기
     closeModal('modal_order');
