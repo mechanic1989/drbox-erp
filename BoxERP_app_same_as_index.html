@@ -1079,7 +1079,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.12</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.13</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -5875,8 +5875,8 @@ function renderPOs(){
   pg.items.forEach(function(item,n){
     const p=item.p, i=item.i; var displayVendor=item.displayVendor;
     const bg=n%2===0?'#FFF':'#F8F9FA';
-    // 이 발주건에 입고완료된 stock이 있으면 잠금
-    const hasReceived=!!(p.num&&I.get(I.stocksByPo,p.num).some(function(s){return s.status==='입고완료';}));
+    // 이 발주 줄이 입고됐으면 잠금 — 줄마다 따로 봄 (예전에는 발주번호만 보아서, 한 줄만 입고돼도 같은 번호의 다른 줄까지 잠겼음)
+    const hasReceived=_poLineReceived(I,p);
     const pLocked=isMonthClosed(p.issuedDate||p.date);
     var manageBtns;
     if(pLocked){
@@ -5915,6 +5915,82 @@ function renderPOs(){
   });
   html+=pgRow('pos',pg,12,'renderPOs');
   tbody.innerHTML=html||'<tr><td colspan="12" style="text-align:center;padding:20px;color:#999">발주 내역이 없습니다</td></tr>';
+}
+
+// ════ 발주 줄 ↔ 입고 기록 짝짓기 ════
+// 발주번호 하나에 여러 줄이 들어가고, 같은 품목이 수주별로 두 줄일 수도 있다 (같은 품목의 수주 두 건을 한 번에 발주한 경우).
+// 발주번호나 '발주번호+품명'만으로 찾으면 같은 번호의 다른 줄이 잡히므로, 수주번호까지 같은 줄·기록을 먼저 본다.
+
+// 입고 기록 s 가 가리키는 발주 줄 (같은 발주번호 안에서). 없으면 null
+//  ① 품명과 수주번호가 모두 같은 줄
+//  ② 품명만 같은 줄 — 수주번호가 비었거나 어긋난 옛 자료용. 단, 그 줄의 수주가 같은 발주번호로 입고 기록을 따로 가지고 있으면 남의 줄이므로 건너뜀
+//     (같은 품목 두 줄 가운데 한 줄만 발주취소했을 때, 취소한 쪽의 입고 대기 건이 남은 줄에 붙어 '발주완료'로 보이지 않게)
+function _poLineOfStock(I,s){
+  if(!s||!s.poNum) return null;
+  var lines=I.get(I.posByNum,s.poNum), so=s.fromOrder||'';
+  var hit=lines.find(function(p){ return p.product===s.product&&(p.fromOrder||'')===so; });
+  if(hit) return hit;
+  var sibs=I.get(I.stocksByPo,s.poNum);
+  return lines.find(function(p){
+    if(p.product!==s.product) return false;
+    var po=p.fromOrder||'';
+    return !(po&&so&&sibs.some(function(x){ return x!==s&&(x.fromOrder||'')===po; }));
+  })||null;
+}
+// 발주번호 하나의 요약 — 그 번호로 입고완료된 기록이 어느 수주의 것인지. 색인(getIdx)이 살아 있는 동안 번호마다 한 번만 계산
+//  (줄마다 다시 훑으면 줄이 아주 많은 번호에서 느려짐)
+//  · any: 그 번호로 입고완료된 기록이 하나라도 있음
+//  · recvOrders: 그 번호로 입고완료된 기록의 수주번호들
+//  · loose: 수주번호가 없는 입고완료 기록이 있음 (누구 것인지 모름)
+//  · stray: 그 번호의 어느 줄 것도 아니고, 자기 수주의 발주 줄이 다른 곳에도 없는 입고완료 기록이 있음 (누구 것인지 모름)
+//           — 자기 수주의 발주 줄이 다른 곳에 있는 기록은 그쪽 것 (발주취소·재발주 뒤 옛 번호가 남은 것)이라 이 번호와 무관
+function _poNumInfo(I,num){
+  var memo=I._poNumInfo||(I._poNumInfo=Object.create(null));
+  if(memo[num]) return memo[num];
+  var lineOrders=Object.create(null), recvOrders=Object.create(null), any=false, loose=false, stray=false;
+  I.get(I.posByNum,num).forEach(function(x){ if(x&&x.fromOrder) lineOrders[x.fromOrder]=true; });
+  I.get(I.stocksByPo,num).forEach(function(s){
+    if(!s||s.status!=='입고완료') return;
+    any=true;
+    var so=s.fromOrder||'';
+    if(!so){ loose=true; return; }
+    recvOrders[so]=true;
+    if(!lineOrders[so]&&!(Object.prototype.hasOwnProperty.call(I.ordersByNum,so)&&I.get(I.posByOrder,so).length)) stray=true;
+  });
+  return (memo[num]={any:any,recvOrders:recvOrders,loose:loose,stray:stray});
+}
+// 발주 한 줄이 입고됐는지 — 줄마다 따로 본다.
+//  예전에는 번호만 보아서, 한 줄만 입고돼도 같은 번호의 다른 줄까지 '입고완료(잠금)'이 되고 홈·브리핑의 '미입고 발주'에서도 빠졌음.
+//  ⓪ 수주번호가 없는 발주 줄(수주 없이 만든 발주 · [수정]으로 수주 연결이 끊긴 줄)은 어느 입고 기록이 자기 것인지 가릴 수 없어 예전처럼 번호 기준
+//  ① 이 번호로 입고완료된 기록 가운데: 이 줄의 수주 것이면 입고된 것. 같은 번호의 다른 줄 수주 것이면 그 줄의 입고(이 줄과 무관).
+//     누구 것인지 알 수 없는 기록(_poNumInfo 의 loose·stray)이 있으면 예전처럼 이 줄도 입고된 것으로 봄 (잠금 유지)
+//  ② 이 수주의 입고가 다른 번호로(또는 번호 없이) 기록된 경우 — 발주 전에 입고처리했거나, 발주취소 뒤 입고하고 다시 발주했거나, 분할 발주로 연결이 어긋난 경우.
+//     이 번호로 된 입고 대기 건이 남아 있으면 아직 안 들어온 것. 없으면, 같은 수주의 다른 발주 줄 것이 분명한 기록을 뺀 입고완료 수량이 있을 때 입고된 것으로 봄
+//     (이렇게 보지 않으면 이미 들어온 발주가 '미입고 발주'에 계속 남고 발주취소도 열림).
+//     분할 발주로 이 수주의 발주 줄이 여럿이면, 그 수량을 '자기 번호로 된 입고 기록이 하나도 없는' 줄들에 앞에서부터 나눠 봄
+//     — 한 번 들어온 수량 때문에 아직 안 들어온 줄까지 모두 입고된 것처럼 보이지 않게
+function _poLineReceived(I,p){
+  if(!p||!p.num) return false;
+  var mine=p.fromOrder||'', info=_poNumInfo(I,p.num);
+  if(!mine) return info.any;
+  if(info.recvOrders[mine]||info.loose||info.stray) return true;
+  var rows=I.get(I.stocksByOrder,mine).filter(function(s){ return s&&s.product===p.product; });
+  if(rows.some(function(s){ return s.status!=='입고완료'&&(s.poNum||'')===p.num; })) return false;
+  var own=I.get(I.posByOrder,mine).filter(function(x){ return x&&x.num&&x.product===p.product; });
+  var free=0, got=false;
+  rows.forEach(function(s){
+    if(s.status!=='입고완료') return;
+    var n=s.poNum||'';
+    if(n&&own.some(function(x){ return x!==p&&x.num===n; })) return; // 같은 수주의 다른 발주 줄 번호로 기록된 것
+    got=true; free+=Math.max(0,_stockPlanQty(s));
+  });
+  if(!got) return false;
+  var before=0;
+  for(var i=0;i<own.length&&own[i]!==p;i++){
+    var x=own[i];
+    if(!rows.some(function(s){ return (s.poNum||'')===x.num; })) before+=(+x.qty||0);
+  }
+  return before===0||free>before;
 }
 
 // ════ 입고 렌더링 ════
@@ -5962,11 +6038,18 @@ function renderStocks(){
       ?'<span style="font-size:9px;background:#E8F5E9;color:#1B5E20;padding:1px 5px;border-radius:8px;font-weight:600;white-space:nowrap">'+inNoStr+'</span>'
       :'<span style="color:#bbb;font-size:10px">-</span>';
 
-    // 발주수량: 연결된 PO qty (poNum+품명 우선 매칭)
+    // 이 입고 기록의 발주 줄 — 같은 발주번호 안에서 품명+수주번호가 모두 같은 줄을 먼저 찾음 (_poLineOfStock).
+    //  예전에는 품명만 보아서, 같은 발주번호에 같은 품목이 두 줄(수주가 다른 두 건)이면 두 줄 모두 첫 줄로 잡혀 발주수량이 틀리게 나왔음
+    var poLine=_poLineOfStock(I,s);
+
+    // 발주수량: 연결된 PO qty
     var linkedPO=null;
     if(s.poNum){
       var byNum=I.get(I.posByNum,s.poNum);
-      linkedPO=byNum.find(function(p){return p.product===s.product;})||byNum[0]||null;
+      linkedPO=poLine
+        ||(s.fromOrder?byNum.find(function(p){return p.fromOrder===s.fromOrder;}):null)  // 품명이 달라졌어도 같은 수주의 줄
+        ||byNum.find(function(p){return !p.fromOrder||!s.fromOrder;})                    // 수주번호가 없는 옛 자료: 예전처럼 그 번호의 줄
+        ||null;                                                                          // 그 밖(모두 다른 수주의 줄 — 발주취소 뒤 옛 번호가 남은 경우 등)은 남의 줄 수량을 쓰지 않음
     }
     if(!linkedPO&&s.fromOrder){
       var byOrd=posOf(s.fromOrder).filter(function(p){return p.status==='발주완료';});
@@ -5975,10 +6058,7 @@ function renderStocks(){
     const poQty=linkedPO?(+linkedPO.qty||0):(+s.qty||0);
 
     // 상태 배지/버튼용: 반드시 품명이 일치하는 발주완료 PO만 매칭 (다른 품목 PO가 잘못 연결되지 않도록)
-    var strictLinkedPO=null;
-    if(s.poNum){
-      strictLinkedPO=I.get(I.posByNum,s.poNum).find(function(p){return p.product===s.product;})||null;
-    }
+    var strictLinkedPO=poLine;
     if(!strictLinkedPO&&s.fromOrder){
       strictLinkedPO=posOf(s.fromOrder).find(function(p){return p.status==='발주완료'&&p.product===s.product;})||null;
     }
@@ -8431,8 +8511,7 @@ function bulkDeletePOs(){
     const p=pos[i];
     if(!p) return false;
     if(isMonthClosed(p.issuedDate||p.date)) return false;
-    const hasReceived=p.num&&stocks.some(function(s){return s.poNum===p.num&&s.status==='입고완료';});
-    if(hasReceived) return false;
+    if(_poLineReceived(getIdx(),p)) return false; // 이 줄이 입고된 경우만 (같은 발주번호의 다른 줄 입고와 무관)
     return true; // 미발주 or 발주완료+미입고 모두 삭제 가능
   });
   const skipped=idxs.length-targets.length;
@@ -11991,8 +12070,20 @@ function renderPurLedger(){
     +'</tr>';
 }
 
+// 입고 기록의 '자기 발주 줄' — 발주번호+품명+수주번호가 모두 같은 줄, 없으면 같은 수주·같은 품명의 줄.
+//  발주번호 하나에 여러 줄이 들어가므로(같은 품목 두 줄 포함) 번호만으로 찾으면 남의 줄이 잡히고,
+//  발주취소 뒤 입고 기록에 옛 번호가 남은 경우에는 그 번호에 자기 줄이 없어 남의 줄(다른 품목일 수도 있음)의 단가·발주처가 잡혔음
+function _stockOwnPoLine(s,pos){
+  var so=(s&&s.fromOrder)||'';
+  return (s&&s.poNum?pos.find(function(p){return p.num===s.poNum&&p.product===s.product&&(p.fromOrder||'')===so;}):null)
+      ||(so?pos.find(function(p){return p.fromOrder===so&&p.product===s.product;}):null)||null;
+}
+
 // 발주처 조회 헬퍼
 function getStockVendor(s, pos, master){
+  // 이 입고 기록의 자기 발주 줄의 발주처를 먼저 봄 (_stockOwnPoLine). 없으면 아래 예전 순서 그대로
+  var p0=_stockOwnPoLine(s,pos);
+  if(p0&&p0.vendor) return p0.vendor;
   if(s.poNum){
     var p=pos.find(function(p){return p.num===s.poNum&&p.product===s.product;})
         ||pos.find(function(p){return p.num===s.poNum;});
@@ -12009,6 +12100,10 @@ function getStockVendor(s, pos, master){
 
 // 발주단가 조회 헬퍼 (㎡당 단가 → 공급금액은 별도 계산 필요)
 function getStockBuyPrice(s, pos, master){
+  // 이 입고 기록의 자기 발주 줄 단가를 먼저 봄 (_stockOwnPoLine) — 같은 발주번호에 같은 품목이 두 줄이고 줄마다 단가가 다르거나,
+  //  입고 기록에 옛 발주번호가 남아 그 번호에 남의 줄만 있는 경우에도 자기 수주의 발주 단가가 잡히게. 단가가 없으면 아래 예전 순서 그대로
+  var p0=_stockOwnPoLine(s,pos);
+  if(p0&&p0.buy_price) return +p0.buy_price;
   if(s.poNum){
     var p=pos.find(function(p){return p.num===s.poNum&&p.product===s.product;})
         ||pos.find(function(p){return p.num===s.poNum;});
@@ -16028,7 +16123,7 @@ function buildDailyBriefing(){
   var dueToday=open.filter(function(o){ return o.due===td; });
   var dueSoon=open.filter(function(o){ return o.due>td&&o.due<=in3; }).sort(function(a,b){ return a.due<b.due?-1:1; });
   var overdue=open.filter(function(o){ return o.due<td; }).sort(function(a,b){ return a.due<b.due?-1:1; });
-  var _Ib=getIdx(); var pendingPOs=pos.filter(function(p){ if(p.status!=='발주완료') return false; return !_Ib.get(_Ib.stocksByPo,p.num).some(function(s){ return s.status==='입고완료'; }); });
+  var _Ib=getIdx(); var pendingPOs=pos.filter(function(p){ if(p.status!=='발주완료') return false; return !_poLineReceived(_Ib,p); }); // 줄마다 따로 (같은 발주번호의 다른 줄 입고와 무관)
   var latePOs=pendingPOs.filter(function(p){ return p.due&&p.due<td; });
   var yShip=deliveries.filter(function(d){ return (d.date||d.lastOutDate||'')===yd&&(+(d.qty||d.outQty||0))>0; });
   var yQty=0,yAmt=0; yShip.forEach(function(d){ var q=+(d.qty||d.outQty||0); yQty+=q; var m=getIdx().findMaster(d.client,d.product); yAmt+=getPriceAt(m,d.date||d.lastOutDate)*q; });
@@ -16315,9 +16410,9 @@ function renderDashboard(){
   });
 
   // 미입고 발주
+  //  같은 발주번호의 다른 줄이 입고됐다고 아직 안 들어온 줄까지 빠지지 않게, 줄마다 따로 봄 (_poLineReceived)
   var pendingPOs=pos.filter(function(p){
-    var received=_I.get(_I.stocksByPo,p.num).some(function(s){return s.status==='입고완료';});
-    return p.status==='발주완료'&&!received;
+    return p.status==='발주완료'&&!_poLineReceived(_I,p);
   });
 
   // 이번달 수주 건수
@@ -17313,12 +17408,18 @@ function runDataHealth(){
     Object.keys(dupM).filter(function(k){ return dupM[k].length>1; }).map(function(k){ var ms=dupM[k].map(function(i){ return master[i]; }); return {label:ms[0].client+' · '+ms[0].product+' × '+ms.length+' ('+ms.map(function(m){ return (m.code||'?')+' '+(m.price||0)+'원'; }).join(', ')+')',go:{tab:'tab_master',search:ms[0].product}}; }));
   // 4. 번호 중복
   var dupNum=function(arr,f){ var seen={}, out=[]; arr.forEach(function(r){ var v=r[f]; if(!v) return; if(seen[v]===1) out.push(v); seen[v]=(seen[v]||0)+1; }); return out; };
-  add('code_dup','err','관리번호·수주번호·출고번호 중복','같은 번호가 2건 이상이면 엑셀 갱신·검색·명세서에서 서로 섞입니다.',
+  // 발주번호·출고번호는 번호 하나에 여러 줄(품목)이 들어가는 것이 정상 — 서로 다른 발주(출고)가 같은 번호를 쓸 때만 중복으로 봄.
+  //  (예전에는 품목이 두 줄 이상인 발주·출고가 모두 '번호 중복' 오류로 나왔음)
+  //  · 발주: 한 번에 발주한 줄들은 발주처와 발주일이 같으므로, 둘 중 하나라도 다르면 따로 나간 발주
+  //  · 출고: 출고번호는 거래처별로 매기므로 거래처가 다르면 따로 나간 출고 (거래처 이름을 바꾼 뒤에도 맞도록 수주의 거래처를 먼저 봄)
+  var dupDoc=function(arr,f,who){ var first={}, hit={}, out=[]; arr.forEach(function(r){ var v=r&&r[f]; if(!v) return; var w=who(r); if(!w) return; if(first[v]===undefined) first[v]=w; else if(first[v]!==w&&!hit[v]){ hit[v]=1; out.push(v); } }); return out; };
+  var _ordCl={}; orders.forEach(function(o){ if(o&&o.num) _ordCl[o.num]=o.client||''; });
+  add('code_dup','err','관리번호·수주번호·발주번호·출고번호 중복','같은 번호가 2건 이상이면 엑셀 갱신·검색·명세서에서 서로 섞입니다. (발주번호·출고번호는 품목이 여러 줄인 것은 정상이라, 발주처나 발주일이 다른 발주 · 거래처가 다른 출고가 같은 번호를 쓸 때만 표시합니다.)',
     [].concat(dupNum(master,'code').map(function(v){ return {label:'제품 관리번호 '+v,go:{tab:'tab_master',search:v}}; }),
               dupNum(clients,'code').map(function(v){ return {label:'거래처 관리번호 '+v,go:{tab:'tab_client',search:v}}; }),
               dupNum(orders,'num').map(function(v){ return {label:'수주번호 '+v,go:{tab:'tab_order',search:v}}; }),
-              dupNum(pos.filter(function(p){ return p.num; }),'num').map(function(v){ return {label:'발주번호 '+v,go:{tab:'tab_po',search:v}}; }),
-              dupNum(deliveries,'outNo').map(function(v){ return {label:'출고번호 '+v,go:{tab:'tab_delivery',search:v}}; })));
+              dupDoc(pos,'num',function(p){ var v=String(p.vendor||'').trim(); return v?v+'\u2016'+String(p.issuedDate||''):''; }).map(function(v){ return {label:'발주번호 '+v+' — 발주처나 발주일이 다른 발주가 같은 번호를 씀',go:{tab:'tab_po',search:v}}; }),
+              dupDoc(deliveries,'outNo',function(d){ return String(_ordCl[d.orderNum]||d.client||'').trim(); }).map(function(v){ return {label:'출고번호 '+v+' — 거래처가 다른 출고가 같은 번호를 씀',go:{tab:'tab_delivery',search:v}}; })));
   // 5. 출고수량 불일치 (수주.outQty ≠ 출고 합계)
   //    · 수주수량보다 많이 출고한 것은 입고된 만큼 확인받고 넣은 정상 기록(초과 납품)이므로 오류로 보지 않음
   //      — 잘못된 초과는 아래 5-2(입고보다 많이 출고) · 5-3(같은 출고번호에 같은 수주가 두 줄)에서 잡음
@@ -17336,10 +17437,10 @@ function runDataHealth(){
   // 5-2. 입고완료 수량보다 많이 출고된 수주 — 출고처리 창에서는 막히지만, 출고 뒤 입고취소·출고 수정·예전 중복 출고로 생길 수 있음.
   //      입고완료가 일부라도 있는 수주는 '주의', 입고완료가 하나도 없는 수주(입고처리를 건너뛴 옛 자료일 수 있음)는 '정보'로 따로 표시
   var overStk=orders.filter(function(o){ return o.num&&hasStock[o.num]&&Math.max(outSum[o.num]||0,+o.outQty||0)>(recvSum[o.num]||0); });
-  var overStkItem=function(o){ var ot=Math.max(outSum[o.num]||0,+o.outQty||0), rc=recvSum[o.num]||0; return {label:o.num+' '+(o.client||'')+' · '+(o.product||'')+' — 입고완료 '+rc.toLocaleString()+' / 출고 '+ot.toLocaleString()+' (+'+(ot-rc).toLocaleString()+')',go:{tab:'tab_delivery',search:o.num}}; };
-  add('out_over_stock','warn','입고완료 수량보다 많이 출고된 수주','출고 수량이 입고완료 수량보다 많습니다 (그만큼 재고가 맞지 않습니다). 출고한 뒤 입고취소를 했거나, 출고 수정에서 수량을 잘못 넣었거나, 예전 버전의 중복 출고일 수 있습니다. 입고관리·납기관리에서 실제 수량을 확인하세요.',
+  var overStkItem=function(o){ var ot=Math.max(outSum[o.num]||0,+o.outQty||0), rc=recvSum[o.num]||0; return {label:o.num+' '+(o.client||'')+' · '+(o.product||'')+' — 입고완료 '+rc.toLocaleString()+' / 출고 '+ot.toLocaleString()+' (+'+(ot-rc).toLocaleString()+')',go:{tab:'tab_stock',search:o.num}}; };
+  add('out_over_stock','warn','입고완료 수량보다 많이 출고된 수주','출고 수량이 입고완료 수량보다 많습니다 (그만큼 재고가 맞지 않습니다). 발주보다 더 들어온 것을 그대로 출고한 경우라면, [이동]으로 입고관리의 그 줄에 가서 [＋수량]에 더 들어온 수량을 넣으면 해결됩니다 (매입도 그만큼 잡힘). 그 밖에는 출고한 뒤 입고취소를 했거나, 출고 수정에서 수량을 잘못 넣었거나, 예전 버전의 중복 출고일 수 있으니 납기관리에서 출고 수량을 확인하세요.',
     overStk.filter(function(o){ return recvSum[o.num]!==undefined; }).map(overStkItem));
-  add('out_no_stock','info','입고완료 없이 출고된 수주','입고완료 기록이 하나도 없는데 출고된 수주입니다 (입고처리를 건너뛴 예전 자료이거나, 출고한 뒤 입고취소한 경우). 재고시트에는 출고 초과로 잡힙니다. 최근 것이면 입고관리에서 입고처리를 해주세요.',
+  add('out_no_stock','info','입고완료 없이 출고된 수주','입고완료 기록이 하나도 없는데 출고된 수주입니다 (입고처리를 건너뛴 예전 자료이거나, 출고한 뒤 입고취소한 경우). 재고시트에는 출고 초과로 잡힙니다. 최근 것이면 [이동]으로 입고관리에 가서 입고처리를 해주세요.',
     overStk.filter(function(o){ return recvSum[o.num]===undefined; }).map(overStkItem));
   // 5-3. 같은 출고번호에 같은 수주가 두 줄 이상 — 예전 버전에서 나눠 출고한 수주를 한꺼번에 체크해 출고하면 같은 출고가 두 번 저장되던 오류의 흔적 (지금은 생기지 않음)
   var dupLine={}; deliveries.forEach(function(d){ if(!d||!d.outNo||!d.orderNum||!((+d.qty||0)>0)) return; var k=d.outNo+'‖'+d.orderNum; (dupLine[k]=dupLine[k]||[]).push(d); }); // 수량 0 인 줄은 세지 않음 (출고 수정에서 0 으로 고친 줄)
@@ -17361,7 +17462,10 @@ function runDataHealth(){
     pos.filter(function(p){
       if(p.status!=='발주완료'||!p.fromOrder) return false;
       var _I=getIdx(); var cand=_I.get(_I.stocksByOrder,p.fromOrder).concat(p.num?_I.get(_I.stocksByPo,p.num):[]);
-      var linked=cand.filter(function(s,ix){ return cand.indexOf(s)===ix&&s.product===p.product&&((p.num&&s.poNum===p.num)||(!s.poNum&&s.fromOrder===p.fromOrder)); });
+      // 같은 수주의 입고 기록에 옛 발주번호가 남은 것(발주취소 뒤 입고하고 다시 발주한 경우)도 이 줄의 것으로 봄 — 같은 수주의 다른 발주 줄 번호가 아닐 때.
+      //  (빼놓으면 이미 들어온 발주에 [미입고 생성]을 권하게 되고, 누르면 같은 수량이 한 번 더 입고될 수 있음)
+      var _own=_I.get(_I.posByOrder,p.fromOrder);
+      var linked=cand.filter(function(s,ix){ return cand.indexOf(s)===ix&&s.product===p.product&&((p.num&&s.poNum===p.num)||(!s.poNum&&s.fromOrder===p.fromOrder)||(s.poNum&&s.fromOrder===p.fromOrder&&!_own.some(function(x){ return x!==p&&x.num===s.poNum&&x.product===p.product; }))); });
       if(linked.some(function(s){ return s.status==='미입고'; })) return false;
       var got=linked.reduce(function(a,s){ return a+(+s.qty||0); },0);
       return got<(+p.qty||0);
@@ -17441,6 +17545,9 @@ function healthFix(issueId,itemIdx){
 }
 function healthGo(tab,search){
   var o=document.getElementById('health_overlay'); if(o) o.remove();
+  // 가는 탭의 상태 필터를 '전체'(첫 항목)로 — 필터에 걸려 있으면 고쳐야 할 줄이 보이지 않음 (예: 입고관리를 '미입고'만 보고 있던 경우)
+  var _hf={tab_stock:'stock_filter',tab_po:'po_filter_status',tab_order:'order_filter_status',tab_delivery:'del_filter'}[tab];
+  var _hfEl=_hf?document.getElementById(_hf):null; if(_hfEl) _hfEl.selectedIndex=0;
   if(typeof gsGo==='function') gsGo({tab:tab,search:search||''}); else switchTab(tab);
 }
 function openHealthModal(){
