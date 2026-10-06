@@ -1079,7 +1079,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.11</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.12</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -5026,7 +5026,7 @@ store.onReady(function(){ try{ applyPaperTable(); }catch(e){ console.warn('원�
 // ════ 마감 헬퍼 ════
 function isMonthClosed(dateStr){
   if(!dateStr) return false;
-  var ym=dateStr.substring(0,7);
+  var ym=String(dateStr).substring(0,7);
   var closings=loadData('closings');
   return closings.some(function(c){return c.yearMonth===ym;});
 }
@@ -6005,6 +6005,10 @@ function renderStocks(){
       actionBtn=hyunpumBtn+'<button onclick="completeStock('+i+')" style="padding:3px 10px;background:#E0F2F1;color:#00695C;border:1px solid #80CBC4;border-radius:4px;font-size:10px;cursor:pointer">입고처리</button>';
     } else {
       actionBtn=hyunpumBtn
+        // 입고완료 건: 나중에 더 들어온 수량을 더하는 [＋수량] (입고일·입고번호는 그대로).
+        //  같은 발주의 미입고가 남아 있으면 보이지 않음 — 그때는 미입고 줄의 [입고처리]에 넣어야 수량이 두 번 잡히지 않음
+        +((s.fromOrder&&I.get(I.stocksByOrder,s.fromOrder).some(function(x){ return x!==s&&x.status==='미입고'&&x.product===s.product&&(x.poNum||'')===(s.poNum||'')&&(+x.qty||0)>0; }))?''
+          :'<button onclick="addStockQty('+i+')" title="입고 수량 추가 — 입고일·입고번호는 그대로 두고 더 들어온 수량만 더합니다" style="padding:3px 8px;background:#E0F2F1;color:#00695C;border:1px solid #80CBC4;border-radius:4px;font-size:10px;cursor:pointer;margin-right:3px">＋수량</button>')
         +'<button onclick="cancelStock('+i+')" style="padding:3px 10px;background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A;border-radius:4px;font-size:10px;cursor:pointer">입고취소</button>';
     }
     html+='<tr style="background:'+bg+'">'
@@ -6017,7 +6021,10 @@ function renderStocks(){
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-weight:700;color:#6A1B9A;font-size:11px">'+(s.poNum||'-')+'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-size:11px">'+(s.client||'-')+'</td>'
       +'<td style="padding:6px;text-align:left;border-bottom:1px solid #EEE;font-size:11px">'+(s.product||'-')+'</td>'
-      +'<td style="padding:6px;text-align:right;border-bottom:1px solid #EEE;font-size:11px;font-weight:600">'+poQty.toLocaleString()+'</td>'
+      +'<td style="padding:6px;text-align:right;border-bottom:1px solid #EEE;font-size:11px;font-weight:600">'+poQty.toLocaleString()
+        // 입고완료인데 실제 입고수량이 발주수량과 다르면(부분 입고·초과 입고) 그 수량을 함께 표시
+        +((!isMi&&((+s.qty||0)!==poQty||(+s.overQty||0)>0))?'<div style="font-size:9px;font-weight:600;color:#00695C;white-space:nowrap">입고 '+(+s.qty||0).toLocaleString()+((+s.overQty||0)>0?' <span style="color:#C62828">(+'+(+s.overQty).toLocaleString()+')</span>':'')+'</div>':'')
+      +'</td>'
       +'<td style="padding:6px;text-align:right;border-bottom:1px solid #EEE;font-size:11px">'+miQtyCell+'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE">'+(function(){
           if(s.status==='입고완료') return statusBadge('입고완료');
@@ -6146,9 +6153,11 @@ function renderDelivery(){
       if(unlinkedDev.length>0) devBadge='<span style="padding:2px 5px;border-radius:10px;font-size:9px;font-weight:700;background:#FFF9C4;color:#F57F17;margin-left:3px" title="미연동 개발비 '+unlinkedDev.length+'건">💰미연동</span>';
       else if(linkedDev.length>0) devBadge='<span style="padding:2px 5px;border-radius:10px;font-size:9px;font-weight:700;background:#E8F5E9;color:#2E7D32;margin-left:3px" title="개발비 연동완료">💰연동</span>';
       var dLocked=isMonthClosed(o.date);
-      var outBtn=(delivSt!=='출고완료'&&!dLocked)
+      // 출고완료여도 입고된 수량이 출고보다 많으면(초과 입고분) 추가 출고 가능
+      var outBtn=((delivSt!=='출고완료'||stockedQtyTotal>outQty)&&!dLocked)
         ?'<button onclick="deliveryOutOne('+oi+')" style="padding:2px 7px;background:#BF360C;color:#fff;border:none;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;margin-right:2px">🚚</button>':'';
-      var cancelBtn=(outQty>0&&!dLocked)
+      // ↩ 출고취소: 마감된 달 날짜의 출고는 지우지 않으므로, 이 수주의 출고가 모두 마감된 달이면 숨김 (일부만 마감된 달이면 열린 달의 출고만 취소됨)
+      var cancelBtn=(outQty>0&&!dLocked&&!(allOrderDeliveries.length&&allOrderDeliveries.every(function(d){ return isMonthClosed(d.date); })))
         ?'<button onclick="deliveryCancelOne('+oi+')" style="padding:2px 7px;background:#FFF8E1;color:#E65100;border:1px solid #FFCC02;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer">↩</button>':'';
       var oc=o.client?o.client.replace(/'/g,"\\'"):'';
       // 🖨 거래명세표: 이 행의 거래처 것만 (한 출고번호에 거래처가 섞여 있어도 눌린 거래처 명세표만)
@@ -6289,7 +6298,7 @@ function editDelivery(outNo){
     var otherOutQty=deliveries.filter(function(x){return x.orderNum===d.orderNum&&x.outNo!==outNo;}).reduce(function(a,x){return a+(+(x.qty||0));},0);
     var linked=o?stocks.filter(function(s){return s.fromOrder===o.num;}):[];
     var stockedQty=linked.filter(function(s){return s.status==='입고완료';}).reduce(function(a,s){return a+(+s.qty||0);},0);
-    var remain=totalQty-otherOutQty;
+    var remain=Math.max(0,totalQty-otherOutQty);
     var currentQty=+(d.qty||0);
     rows+=
       '<tr>'
@@ -6316,6 +6325,7 @@ function editDelivery(outNo){
         +'<input type="date" id="_ed_date" value="'+sampleDate+'" style="padding:6px 10px;border:2px solid #BF360C;border-radius:6px;font-size:12px;font-weight:600;outline:none">'
         +'<span style="font-size:11px;color:#888;margin-left:8px">출고번호: <b style="color:#1F4E79">'+outNo+'</b></span>'
       +'</div>'
+      +'<div style="font-size:10px;color:#888;margin:-4px 0 10px">※ 이 출고에 빠진 품목을 더 넣으려면: 넣을 품목의 🚚 출고 창에서 「출고번호」를 이 번호로 고르면 같은 거래명세표에 들어갑니다.</div>'
       +'<table style="width:100%;border-collapse:collapse;margin-bottom:16px">'
         +'<thead><tr style="background:#BF360C;color:#fff">'
           +'<th style="padding:8px 6px;font-size:11px">거래처</th>'
@@ -6382,6 +6392,47 @@ function editDelivery(outNo){
 }
 
 // ════ 출고 처리 ════
+// 지금 더 출고할 수 있는 수량 = 입고완료 합계 − 이미 출고한 수량 (수주수량보다 많이 입고됐으면 그만큼 더 출고 가능)
+function _delivShippable(o,stocks){
+  if(!o) return 0;
+  var stocked=(stocks||loadData('stocks')).filter(function(s){ return s&&s.fromOrder===o.num&&s.status==='입고완료'; }).reduce(function(a,s){ return a+(+s.qty||0); },0);
+  return stocked-(+(o.outQty||0));
+}
+// 출고 창의 기본 출고수량 = 남은 수주수량 + '확인하고 초과 입고한 수량(overQty)' — 입고된 범위 안에서.
+//  입고 기록이 수주보다 많더라도 초과 입고로 확인된 것(입고 때 확인 · [＋수량])이 아니면 기본값에는 넣지 않음 (직접 입력은 가능)
+function _delivDefaultQty(o,stocks){
+  if(!o) return 0;
+  var done=(stocks||loadData('stocks')).filter(function(s){ return s&&s.fromOrder===o.num&&s.status==='입고완료'; });
+  var stocked=done.reduce(function(a,s){ return a+(+s.qty||0); },0), over=done.reduce(function(a,s){ return a+(+s.overQty||0); },0);
+  var outQty=+(o.outQty||0), remain=Math.max(0,(+(o.qty||0))-outQty);
+  return Math.max(0,Math.min(stocked-outQty,remain+over));
+}
+// 출고 수량 입력 창: 입력한 수량이 남은 수주수량보다 많으면 그 줄에 '수주수량 초과 +n' 표시
+function _delivOverHint(i){
+  var el=document.getElementById('del_qty_'+i), hint=document.getElementById('del_over_'+i); if(!el||!hint) return;
+  var q=parseInt(el.value)||0, remain=+(el.getAttribute('data-remain')||0);
+  var over=q-remain;
+  hint.textContent=over>0?('수주수량 초과 +'+over.toLocaleString()):'';
+  hint.style.display=over>0?'block':'none';
+}
+// 같은 거래처의 기존 출고(출고번호) 목록 — 빠뜨린 품목을 그 출고에 끼워 넣을 때 고름
+//  (거래처 한 곳 · 출고일이 하나로 같고 올바른 날짜 · 마감된 달 제외 · 최근 것부터 30개)
+function _delivOutNoCandidates(client){
+  var deliveries=loadData('deliveries'), I=getIdx(), map={}, list=[];
+  deliveries.forEach(function(d){
+    if(!d||!d.outNo) return;
+    var o=I.ordersByNum[d.orderNum];
+    var c=(o&&o.client)||d.client||'';
+    var g=map[d.outNo]; if(!g){ g=map[d.outNo]={outNo:d.outNo,date:d.date||'',dates:[],items:[],freight:0,clients:[]}; list.push(g); }
+    if(g.clients.indexOf(c)===-1) g.clients.push(c);
+    if(g.dates.indexOf(d.date||'')===-1) g.dates.push(d.date||'');
+    var p=(o&&o.product)||d.product||''; if(g.items.indexOf(p)===-1) g.items.push(p);
+    g.freight+=(+d.freight||0);
+  });
+  list=list.filter(function(g){ return g.clients.length===1&&g.clients[0]===client&&g.dates.length===1&&/^\d{4}-\d{2}-\d{2}$/.test(g.date)&&!isMonthClosed(g.date); });
+  list.sort(function(a,b){ return a.date!==b.date?(a.date<b.date?1:-1):(a.outNo<b.outNo?1:(a.outNo>b.outNo?-1:0)); });
+  return list.slice(0,30);
+}
 function deliveryOutOne(idx){
   if(isMonthClosed(today())){
     alert('🔒 '+today().substring(0,7).replace('-','년 ')+'월은 마감된 달입니다.\n출고처리를 할 수 없습니다.');return;
@@ -6394,7 +6445,7 @@ function deliveryOutOne(idx){
   }
   const outQty=+(o.outQty||0);
   const totalQty=+(o.qty||0);
-  if(outQty>=totalQty){alert('이미 전량 출고 처리된 항목입니다.');return;}
+  if(outQty>=totalQty&&_delivShippable(o,stocks)<=0){alert('이미 전량 출고 처리된 항목입니다.');return;}
   _showDeliveryPopup([{order:o, idx:idx}], orders, stocks);
 }
 function deliveryOutBulk(){
@@ -6405,19 +6456,26 @@ function deliveryOutBulk(){
   }
   const orders=loadData('orders');
   const stocks=loadData('stocks');
-  const targets=checked.map(function(c){
+  // 같은 수주는 한 번만 — 여러 번 나눠 출고한 수주는 목록에 출고번호마다 한 줄씩 있어 여러 번 체크될 수 있음 (예전에는 그만큼 중복 출고됨)
+  const seenIdx={};
+  const cands=checked.map(function(c){
     const i=+c.getAttribute('data-idx');
     return {order:orders[i], idx:i};
   }).filter(function(t){
     if(!t.order) return false;
-    const outQty=+(t.order.outQty||0);
-    const totalQty=+(t.order.qty||0);
-    return outQty<totalQty;
+    if(seenIdx[t.idx]) return false; seenIdx[t.idx]=1;
+    return true;
   });
+  // 미완료 건이 하나라도 체크돼 있으면 예전처럼 미완료 건만 (전체 선택해도 완료 건이 끼어들지 않게).
+  // 체크한 것이 모두 완료 건이면, 확인하고 초과 입고한 수량이 아직 남아 있는 건만 — 완료 건에 더 들어온 수량을 출고하는 길 (수주일이 마감된 달이라 줄의 🚚 가 없을 때 포함)
+  let targets=cands.filter(function(t){ return (+(t.order.outQty||0))<(+(t.order.qty||0)); });
+  if(!targets.length) targets=cands.filter(function(t){ return _delivDefaultQty(t.order,stocks)>0; });
   if(targets.length===0){alert('출고 가능한 항목이 없습니다');return;}
   _showDeliveryPopup(targets, orders, stocks);
 }
 function _showDeliveryPopup(targets, orders, stocks){
+  // 같은 수주가 두 번 들어오지 않게 (여러 번 나눠 출고한 수주는 납기관리 목록에 출고번호마다 한 줄씩 있음)
+  targets=targets.filter(function(t,i,a){ return t&&t.order&&a.findIndex(function(x){ return x&&x.idx===t.idx; })===i; });
   const overlay=document.createElement('div');
   overlay.className='dyn-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center';
 
@@ -6436,10 +6494,12 @@ function _showDeliveryPopup(targets, orders, stocks){
     const o=t.order;
     const totalQty=+(o.qty||0);
     const outQty=+(o.outQty||0);
-    const remain=totalQty-outQty;
+    const remain=Math.max(0,totalQty-outQty);
     const linked=stocks.filter(function(s){return s.fromOrder===o.num;});
     const stockedQty=linked.filter(function(s){return s.status==='입고완료';}).reduce(function(a,s){return a+(+s.qty||0);},0);
     const maxOut=Math.max(0,stockedQty-outQty);
+    // 기본 출고수량: 남은 수주수량 + '확인하고 초과 입고한 수량'까지 (_delivDefaultQty)
+    const defQty=_delivDefaultQty(o,stocks);
     rows+=
       '<tr>'
       +'<td class="rt-client" data-l="거래처" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px">'+_ddEsc(o.client)+'</td>'
@@ -6449,10 +6509,12 @@ function _showDeliveryPopup(targets, orders, stocks){
       +'<td data-l="입고완료" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#2E7D32">'+stockedQty.toLocaleString()+'</td>'
       +'<td data-l="잔여" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#E65100">'+remain.toLocaleString()+'</td>'
       +'<td class="rt-input" data-l="출고수량" style="padding:8px 6px;border-bottom:1px solid #eee">'
-        +'<input type="number" id="del_qty_'+i+'" value="'+maxOut+'" min="0" max="'+maxOut+'" inputmode="numeric"'
-        +' oninput="_calcDelivVehicle()"'
+        +'<input type="number" id="del_qty_'+i+'" value="'+defQty+'" min="0" max="'+maxOut+'" data-remain="'+remain+'" inputmode="numeric"'
+        +' oninput="_calcDelivVehicle();_delivOverHint('+i+')"'
         +' style="width:90px;padding:5px 8px;border:2px solid #BF360C;border-radius:5px;font-size:12px;font-weight:700;text-align:right">'
         +(maxOut<=0?'<div style="font-size:9px;color:#C62828;margin-top:2px">입고수량 부족</div>':'')
+        +'<div id="del_over_'+i+'" style="font-size:9px;color:#E65100;font-weight:700;margin-top:2px;display:none"></div>'
+        +((maxOut>defQty)?'<div style="font-size:9px;color:#888;margin-top:2px">최대 '+maxOut.toLocaleString()+'매까지 출고 가능</div>':'')
       +'</td>'
       +'</tr>';
     // 미연동 개발비 있으면 바로 아래 표시
@@ -6480,12 +6542,32 @@ function _showDeliveryPopup(targets, orders, stocks){
   var _clientSet=[]; targets.forEach(function(t){ var c=(t.order&&t.order.client)||''; if(_clientSet.indexOf(c)===-1) _clientSet.push(c); });
   if(_clientSet.length>1) devCostNote+='<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#795548">🏷️ 거래처 '+_clientSet.length+'곳('+_clientSet.map(function(c){ return String(c).replace(/</g,'&lt;'); }).join(', ')+')이 함께 선택되어 <b>출고번호가 거래처별로 따로</b> 매겨지고 거래명세표도 거래처별로 나옵니다. 운반비는 출고 수량 비율로 나눠 기록됩니다.</div>';
 
+  // 출고일 선택 + (거래처가 한 곳이면) 기존 출고번호에 끼워 넣기 선택
+  var _oneClient=(_clientSet.length===1)?_clientSet[0]:null;
+  var _cands=(_oneClient!==null)?_delivOutNoCandidates(_oneClient):[];
+  var _todayStr=today();
+  var dateBar='<div style="margin-bottom:10px;padding:8px 10px;background:#FFF3E0;border:1px solid #FFCC80;border-radius:8px">'
+    +'<div style="display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap">'
+      +'<label for="del_date" style="font-size:12px;font-weight:700;color:#555;white-space:nowrap">📅 출고일</label>'
+      +'<input type="date" id="del_date" value="'+_todayStr+'" min="2000-01-01" max="2099-12-31" style="padding:6px 8px;border:2px solid #BF360C;border-radius:6px;font-size:13px;font-weight:700;outline:none;background:#fff">'
+      +(_cands.length
+        ?'<label for="del_outno_sel" style="font-size:12px;font-weight:700;color:#555;white-space:nowrap;margin-left:6px">출고번호</label>'
+         +'<select id="del_outno_sel" style="flex:1 1 220px;min-width:0;max-width:100%;padding:6px 8px;border:1px solid #BF360C;border-radius:6px;font-size:12px;background:#fff">'
+           +'<option value="">새 출고번호 (거래명세표 따로)</option>'
+           +_cands.map(function(c){ return '<option value="'+_ddEsc(c.outNo)+'">'+_ddEsc(c.outNo)+' · '+_ddEsc(c.date)+' · '+_ddEsc(c.items[0]||'')+(c.items.length>1?' 외 '+(c.items.length-1)+'건':'')+' 에 추가</option>'; }).join('')
+         +'</select>'
+        :'')
+    +'</div>'
+    +'<div id="del_date_hint" style="font-size:10px;color:#795548;margin-top:5px;display:none"></div>'
+  +'</div>';
+
   overlay.innerHTML=''
     +'<div class="pop-fixed" style="background:#fff;border-radius:12px;padding:20px 24px;min-width:640px;max-width:92vw;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3)">'
       +'<div style="font-size:15px;font-weight:700;color:#BF360C;margin-bottom:8px;flex-shrink:0">🚚 출고 수량 입력 <span style="font-size:11px;color:#888;font-weight:400">· '+targets.length+'건</span></div>'
       +'<div data-popup-body style="overflow-y:auto;flex:1 1 auto;min-height:0">'
+      +dateBar
       +devCostNote
-      +'<div style="font-size:11px;color:#666;margin-bottom:10px">※ 출고수량은 입고완료 수량을 초과할 수 없습니다.</div>'
+      +'<div style="font-size:11px;color:#666;margin-bottom:10px">※ 출고수량은 입고완료 수량을 초과할 수 없습니다. (입고된 만큼은 수주수량보다 많아도 출고할 수 있습니다)</div>'
       +'<div id="del_viz_wrap" style="margin-bottom:12px"></div>'
       +'<table class="resp-tbl" style="width:100%;border-collapse:collapse;margin-bottom:16px">'
         +'<thead><tr style="background:#BF360C;color:#fff">'
@@ -6505,7 +6587,7 @@ function _showDeliveryPopup(targets, orders, stocks){
           +'<input type="number" id="del_freight" value="0" min="0" placeholder="0"'
           +' style="width:120px;padding:6px 10px;border:2px solid #E65100;border-radius:6px;font-size:13px;font-weight:700;text-align:right">'
           +'<span style="font-size:12px;color:#555">원</span>'
-          +'<span style="font-size:10px;color:#888">(이번 출고 전체 운반비)</span>'
+          +'<span id="del_freight_hint" style="font-size:10px;color:#888">(이번 출고 전체 운반비)</span>'
         +'</div>'
         +'<div id="del_vehicle_wrap" style="display:flex;gap:8px;align-items:stretch;flex-wrap:wrap"></div>'
       +'</div>'
@@ -6519,6 +6601,29 @@ function _showDeliveryPopup(targets, orders, stocks){
   window._delivVehicleTargets=targets;
   document.body.appendChild(overlay);
   _calcDelivVehicle();
+  targets.forEach(function(t,i){ _delivOverHint(i); });
+  // 출고일·출고번호 선택에 따라 안내 문구 갱신
+  var _dateEl=document.getElementById('del_date'), _selEl=document.getElementById('del_outno_sel'), _manualDate=_todayStr;
+  function _syncDateBar(){
+    var hint=document.getElementById('del_date_hint'), fh=document.getElementById('del_freight_hint');
+    var cand=(_selEl&&_selEl.value)?_cands.find(function(c){ return c.outNo===_selEl.value; }):null;
+    var msg='';
+    if(cand){
+      _dateEl.value=cand.date; _dateEl.disabled=true; _dateEl.style.background='#EEE';
+      msg='📎 '+cand.outNo+' 에 추가합니다 — 그 출고의 거래명세표에 함께 나오고, 출고일은 그 출고의 날짜('+cand.date+')로 들어갑니다.';
+      if(fh) fh.textContent='(추가 운반비 — 기존 '+cand.freight.toLocaleString()+'원에 더해집니다)';
+    } else {
+      if(_dateEl.disabled){ _dateEl.disabled=false; _dateEl.style.background='#fff'; _dateEl.value=_manualDate; }
+      else if(_dateEl.value) _manualDate=_dateEl.value;
+      var dv=_dateEl.value;
+      if(dv&&dv<_todayStr) msg='📌 지난 날짜로 출고처리합니다 — 출고번호·거래명세표·매출이 이 날짜('+dv+')로 잡힙니다.';
+      else if(dv&&dv>_todayStr) msg='⚠️ 오늘보다 뒤의 날짜입니다.';
+      if(fh) fh.textContent='(이번 출고 전체 운반비)';
+    }
+    if(hint){ hint.textContent=msg; hint.style.display=msg?'block':'none'; }
+  }
+  if(_dateEl){ _dateEl.addEventListener('change',_syncDateBar); _dateEl.addEventListener('input',_syncDateBar); }
+  if(_selEl) _selEl.addEventListener('change',_syncDateBar);
   document.getElementById('del_out_cancel').onclick=function(){document.body.removeChild(overlay);};
 
   document.getElementById('del_out_ok').onclick=function(){
@@ -6529,37 +6634,83 @@ function _showDeliveryPopup(targets, orders, stocks){
     const allDeliveries=loadData('deliveries');
     var latestDevCosts=loadData('devCosts');
     const errors=[];
-    const batchDate=today();
+    // 출고수량이 전부 0이면 창을 닫지 않고 안내 (예전에는 아무 일 없이 닫혔음 — 기본값이 0으로 나오는 경우가 있어 안내가 필요)
+    if(!inputQtys.some(function(q){ return q>0; })){ alert('출고수량을 입력해주세요.'); return; }
+    const overs=[];
+    let stale=false, needRecv=false, needAdd=false, needRow=false;
+    // 출고일: 고른 날짜 (기존 출고번호에 추가할 때는 그 출고의 날짜)
+    const selOutNo=document.getElementById('del_outno_sel');
+    const addTo=(selOutNo&&selOutNo.value)||'';
+    let batchDate=(document.getElementById('del_date')||{}).value||'';
+    let addToClient='';
+    if(addTo){
+      const base=allDeliveries.find(function(d){ return d&&d.outNo===addTo; });
+      if(!base){ alert('선택한 출고번호를 찾을 수 없습니다. 창을 닫고 다시 시도해주세요.'); return; }
+      // 한 출고번호 안에 출고일이 다른 기록이 섞여 있으면(예전 자료·엑셀) 추가하지 않음 — 어느 날짜로 들어갈지 알 수 없고, 마감된 달의 기록을 건드릴 수 있음
+      if(allDeliveries.some(function(d){ return d&&d.outNo===addTo&&(d.date||'')!==(base.date||''); })){ alert('선택한 출고번호에는 출고일이 서로 다른 기록이 섞여 있어 추가할 수 없습니다.\n새 출고번호로 처리해주세요.'); return; }
+      const baseOrder=allOrders.find(function(x){ return x&&x.num===base.orderNum; });
+      addToClient=(baseOrder&&baseOrder.client)||base.client||'';
+      batchDate=base.date||batchDate;
+    }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(batchDate)||batchDate<'2000-01-01'){ alert('출고일을 다시 확인해주세요.'+(batchDate?' ('+batchDate+')':'')); return; }
+    if(isMonthClosed(batchDate)){ alert('🔒 '+batchDate.substring(0,7).replace('-','년 ')+'월은 마감된 달입니다.\n해당 날짜로 출고처리할 수 없습니다.'); return; }
+    if(batchDate>today()){
+      // 오늘보다 뒤: 한 달 넘게 뒤면 날짜를 잘못 넣은 것으로 보고 막음(연도 오타 등), 그 안이면 한 번 확인
+      const lim=parseYmd(today()); lim.setDate(lim.getDate()+31);
+      if(batchDate>fmtLocalDate(lim)){ alert('출고일('+batchDate+')이 오늘보다 한 달 넘게 뒤입니다.\n날짜를 다시 확인해주세요.'); return; }
+      if(!confirm('출고일('+batchDate+')이 오늘보다 뒤입니다.\n그대로 출고처리할까요?')) return;
+    }
+    if(!addTo){ const far=parseYmd(today()); far.setDate(far.getDate()-62); if(batchDate<fmtLocalDate(far)&&!confirm('출고일('+batchDate+')이 두 달 넘게 지난 날짜입니다.\n그대로 출고처리할까요?')) return; }
     // 1) 검증: 처리 가능한 항목만 추림
     const okItems=[];
     targets.forEach(function(t,i){
       const qty=inputQtys[i];
       if(qty<=0) return;
       const o=allOrders[t.idx];
-      if(!o) return;
+      // 창이 떠 있는 동안 목록이 바뀌었으면(다른 기기 동기화) 다른 수주를 건드리지 않게 건너뜀
+      if(!o||o.num!==t.order.num){ stale=true; errors.push((t.order.client||'')+' / '+(t.order.product||'')+' : 그 사이 목록이 바뀌어 처리하지 못했습니다 (다시 시도해주세요)'); return; }
       const outQty=+(o.outQty||0);
       const totalQty=+(o.qty||0);
       const linked=allStocks.filter(function(s){return s.fromOrder===o.num;});
       const stockedQty=linked.filter(function(s){return s.status==='입고완료';}).reduce(function(a,s){return a+(+s.qty||0);},0);
       const newOutQty=outQty+qty;
       if(newOutQty>stockedQty){
-        errors.push(o.client+' / '+o.product+' : 입고완료 '+stockedQty+'매 → 출고요청 '+newOutQty+'매 초과');
+        // 아직 입고처리하지 않은 수량이 남아 있거나 입고완료가 하나도 없으면 [입고처리]를, 발주분이 모두 입고된 상태면 [＋수량]을 안내
+        const pendQty=linked.filter(function(s){return s.status==='미입고';}).reduce(function(a,s){return a+Math.max(0,+s.qty||0);},0);
+        if(!linked.length) needRow=true; else if(pendQty>0||!linked.some(function(s){return s.status==='입고완료';})) needRecv=true; else needAdd=true;
+        errors.push(o.client+' / '+o.product+' : 입고완료 '+stockedQty.toLocaleString()+'매 → 출고요청 '+newOutQty.toLocaleString()+'매 초과'+(pendQty>0?' (미입고 '+pendQty.toLocaleString()+'매 남음)':''));
         return;
       }
-      if(newOutQty>totalQty){
-        errors.push(o.client+' / '+o.product+' : 수주수량 '+totalQty+'매 초과');
-        return;
-      }
+      // 수주수량보다 많이 나가는 것(초과 납품)은 입고된 만큼은 허용 — 아래에서 한 번 확인받음
+      if(newOutQty>totalQty) overs.push('· '+o.client+' / '+o.product+' : 수주 '+totalQty.toLocaleString()+'매 → 출고 합계 '+newOutQty.toLocaleString()+'매 (+'+(newOutQty-totalQty).toLocaleString()+')');
       okItems.push({idx:t.idx,o:o,qty:qty,newOutQty:newOutQty});
     });
+    const errHint=(needRow?'\n\n※ 입고 기록이 없는 수주가 있습니다. 발주(발주서 출력)와 입고처리를 먼저 해주세요.':'')
+      +(needRecv?'\n\n※ 아직 입고처리하지 않은 수량이 있습니다. 입고관리에서 먼저 [입고처리]를 해주세요.':'')
+      +(needAdd?'\n\n※ 입고된 수량보다 많이 출고하려면, 더 들어온 수량을 입고관리에서 그 입고 줄의 [＋수량]으로 먼저 더해주세요.':'');
+    // 처리할 수 있는 것이 하나도 없으면 저장하지 않고 안내 — 수량을 고쳐 다시 누를 수 있게 창은 그대로 둠 (목록이 바뀐 경우만 닫음)
+    if(!okItems.length){
+      if(stale) document.body.removeChild(overlay);
+      alert('⚠️ 아래 항목은 처리되지 않았습니다:\n\n'+errors.join('\n')+errHint);
+      if(stale) renderAll();
+      return;
+    }
+    if(overs.length&&!confirm('아래 품목은 수주수량보다 많이 출고됩니다.\n\n'+overs.join('\n')+'\n\n초과 수량도 매출에 잡힙니다. 계속할까요?')) return;
     // 2) 거래처별 묶음 → 거래처마다 출고번호 하나 (거래명세표는 거래처 단위이므로)
     const groups=[];
     okItems.forEach(function(it){ var c=it.o.client||''; var g=groups.find(function(x){ return x.client===c; }); if(!g){ g={client:c,items:[],qty:0}; groups.push(g); } g.items.push(it); g.qty+=it.qty; });
+    if(addTo&&groups.length&&(groups.length>1||groups[0].client!==addToClient)){ alert('기존 출고번호에 추가는 그 출고와 같은 거래처 품목만 됩니다.'); return; }
+    // 그 달 세금계산서를 이미 [발행완료]로 표시한 거래처면 한 번 확인 (그 달 금액이 발행한 금액과 달라지므로)
+    try{
+      var _ym=batchDate.substring(0,7), _inv=loadData('invoices');
+      var _issued=Array.isArray(_inv)?groups.filter(function(g){ return _inv.some(function(v){ return v&&v.status==='발행완료'&&v.ym===_ym&&v.client===g.client; }); }).map(function(g){ return g.client; }):[];
+      if(_issued.length&&!confirm('🧾 '+_ym.replace('-','년 ')+'월 세금계산서를 이미 [발행완료]로 표시한 거래처입니다: '+_issued.join(', ')+'\n\n이 날짜('+batchDate+')로 출고를 넣으면 그 달 금액이 발행한 금액과 달라집니다.\n그대로 출고처리할까요?')) return;
+    }catch(e){ console.warn('invoice check',e); }
     const totalShipQty=groups.reduce(function(a,g){ return a+g.qty; },0);
     // 운반비: 거래처가 여러 곳이면 출고 수량 비율로 배분 (나머지는 첫 거래처에)
     var freightLeft=freight;
     groups.forEach(function(g,gi){
-      g.outNo=generateOutNo();
+      g.outNo=addTo||generateOutNo(batchDate);
       if(gi===groups.length-1) g.freight=freightLeft;
       else { g.freight=(totalShipQty>0)?Math.round(freight*g.qty/totalShipQty):0; freightLeft-=g.freight; }
     });
@@ -6569,16 +6720,21 @@ function _showDeliveryPopup(targets, orders, stocks){
       var freightSaved=false;
       g.items.forEach(function(it){
         allOrders[it.idx].outQty=it.newOutQty;
-        allOrders[it.idx].lastOutDate=batchDate;
-        allOrders[it.idx].outNo=g.outNo;
-        allDeliveries.push({
+        // '가장 최근 출고일·출고번호'는 이번 출고일이 그 수주의 기존 출고일보다 같거나 늦을 때만 바꿈 (지난 날짜로 넣은 출고가 최근 출고 기록을 덮어쓰지 않게)
+        var prevLast=allOrders[it.idx].lastOutDate||'';
+        if(!prevLast||batchDate>=prevLast){ allOrders[it.idx].lastOutDate=batchDate; allOrders[it.idx].outNo=g.outNo; }
+        var fr=freightSaved?0:g.freight;
+        // 기존 출고번호에 추가할 때 그 출고에 같은 수주(같은 날짜)가 이미 있으면 수량만 더함 (명세표에 한 줄로)
+        var ex=addTo?allDeliveries.find(function(d){ return d&&d.outNo===g.outNo&&d.orderNum===it.o.num&&(d.date||'')===batchDate; }):null;
+        if(ex){ ex.qty=(+ex.qty||0)+it.qty; if(fr) ex.freight=(+ex.freight||0)+fr; }
+        else allDeliveries.push({
           outNo:g.outNo,
           orderNum:it.o.num,
           client:it.o.client,
           product:it.o.product,
           qty:it.qty,
           date:batchDate,
-          freight: freightSaved ? 0 : g.freight
+          freight:fr
         });
         freightSaved=true;
       });
@@ -6593,12 +6749,14 @@ function _showDeliveryPopup(targets, orders, stocks){
         latestDevCosts[dcIdx].linkedDate=batchDate;
       }
     });
-    saveData('orders',allOrders);
+    const savedOk=saveData('orders',allOrders)!==false;
     saveData('deliveries',allDeliveries);
     saveData('devCosts',latestDevCosts);
     document.body.removeChild(overlay);
-    if(errors.length>0) alert('⚠️ 아래 항목은 처리되지 않았습니다:\n\n'+errors.join('\n'));
+    if(!savedOk) return; // 읽기 전용(뷰어) 권한: 저장되지 않음 — saveData 가 안내하고 화면을 되돌리므로 완료 안내는 띄우지 않음
+    if(errors.length>0) alert('⚠️ 아래 항목은 처리되지 않았습니다:\n\n'+errors.join('\n')+errHint);
     if(groups.length>1){ try{ showInfoToast('🚚 출고 완료 — 거래처 '+groups.length+'곳이라 출고번호를 따로 매겼습니다: '+groups.map(function(g){ return g.client+' '+g.outNo; }).join(' · '),'#2E7D32'); }catch(e){} }
+    if(addTo||batchDate!==today()){ try{ showInfoToast(addTo?('📎 '+addTo+' 에 '+okItems.length+'건을 추가했습니다 (출고일 '+batchDate+')'):('🚚 '+batchDate+' 날짜로 출고처리했습니다 — '+groups.map(function(g){ return g.outNo; }).join(' · ')),'#2E7D32'); }catch(e){} }
     renderAll();
   };
 }
@@ -6896,8 +7054,9 @@ function generateInNo(){
   seq+=1; store.setItem(key,String(seq));
   return 'IN-'+ds+'-'+(('000'+seq).slice(-3));
 }
-function generateOutNo(){
-  var ds=_todayDs(), key='outNoSeq_'+ds;
+//  dateStr(YYYY-MM-DD)를 주면 그 날짜의 출고번호 — 지난 날짜로 출고처리할 때 번호도 그 날짜로 매김 (없으면 오늘)
+function generateOutNo(dateStr){
+  var ds=(typeof dateStr==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(dateStr))?dateStr.replace(/-/g,''):_todayDs(), key='outNoSeq_'+ds;
   var seq=parseInt(store.getItem(key)||'0')||0;
   try{ seq=Math.max(seq,_maxSeqInData('OUT',ds,[{arr:loadData('deliveries'),field:'outNo'},{arr:loadData('orders'),field:'outNo'}])); }catch(e){}
   seq+=1; store.setItem(key,String(seq));
@@ -7041,7 +7200,8 @@ function printReceiptByOutNo(outNo, onlyClient){
     batch.forEach(function(d){
       // 수주가 지워졌어도 출고 기록(거래처·품명·일자)으로 명세표를 만들 수 있게
       var order=orders.find(function(o){return o.num===d.orderNum;})||{num:d.orderNum||'',client:d.client||'',product:d.product||'',date:d.date||'',lastOutDate:d.date||''};
-      group.push({order:order, batchQty:d.qty});
+      // 명세표의 날짜·단가 기준일은 이 출고(출고번호)의 출고일 — 수주에 남는 '가장 최근 출고일'이 아니라 (부분 출고·지난 날짜 출고 때 날짜가 섞이지 않게)
+      group.push({order:(d.date?Object.assign({},order,{lastOutDate:d.date}):order), batchQty:d.qty});
     });
   } else {
     // 구버전 호환: deliveries가 없는 경우 orders.outNo로 폴백
@@ -7537,22 +7697,37 @@ function _buildReceiptDoc(orderList, outNo, showPrice, selectedDevCostIds, mc){
   return {pagesHtml:pagesHtml,title:title};
 }
 
+// 출고취소 뒤 수주에 남길 값 — 마감된 달의 출고(keep)를 남겨 두는 경우 그 합계·가장 최근 날짜·번호, 없으면 모두 비움
+function _delivApplyCancel(o,keep){
+  if(keep&&keep.length){
+    var last=keep.reduce(function(a,d){ return (!a||(d.date||'')>=(a.date||''))?d:a; },null);
+    o.outQty=keep.reduce(function(a,d){ return a+(+d.qty||0); },0);
+    o.lastOutDate=last.date||''; o.outNo=last.outNo||'';
+  } else {
+    o.outQty=0;
+    delete o.lastOutDate;
+    delete o.outNo;
+  }
+  delete o.outHistory;
+}
 function deliveryCancelOne(idx){
   const orders=loadData('orders');
   const o=orders[idx]; if(!o) return;
   if(isMonthClosed(o.date)){
     alert('🔒 마감된 달의 수주는 출고취소할 수 없습니다.');return;
   }
-  if(!(o.outQty>0)){alert('출고된 수량이 없습니다.');return;}
-  if(!confirm('['+o.num+'] '+o.client+' / '+o.product+'\n출고를 전체 취소하시겠습니까?\n(출고수량이 0으로 초기화됩니다)')) return;
-  orders[idx].outQty=0;
-  delete orders[idx].lastOutDate;
-  delete orders[idx].outNo;
-  delete orders[idx].outHistory;
-  saveData('orders',orders);
-  // ★ deliveries에서도 이 수주의 모든 출고 레코드 삭제
+  // 마감된 달 날짜의 출고 기록은 지우지 않고 남김 — 열린 달의 출고만 취소 (예전에는 수주일의 달만 확인해 마감된 달의 출고까지 지워졌음)
   var allDeliveries=loadData('deliveries');
-  allDeliveries=allDeliveries.filter(function(d){return d.orderNum!==o.num;});
+  const mine=allDeliveries.filter(function(d){ return d&&d.orderNum===o.num; });
+  const keep=mine.filter(function(d){ return isMonthClosed(d.date); });
+  if(keep.length&&keep.length===mine.length){ alert('🔒 마감된 달 날짜의 출고만 있어 출고취소할 수 없습니다.');return; }
+  if(!(o.outQty>0)){alert('출고된 수량이 없습니다.');return;}
+  const keepQty=keep.reduce(function(a,d){ return a+(+d.qty||0); },0);
+  if(!confirm('['+o.num+'] '+o.client+' / '+o.product+'\n'+(keep.length?('마감된 달의 출고 '+keepQty.toLocaleString()+'매는 그대로 두고,\n나머지 출고만 취소하시겠습니까?'):'출고를 전체 취소하시겠습니까?\n(출고수량이 0으로 초기화됩니다)'))) return;
+  _delivApplyCancel(orders[idx],keep);
+  saveData('orders',orders);
+  // ★ deliveries에서도 이 수주의 출고 레코드 삭제 (마감된 달의 것은 남김)
+  allDeliveries=allDeliveries.filter(function(d){return d.orderNum!==o.num||keep.indexOf(d)!==-1;});
   saveData('deliveries',allDeliveries);
   renderAll();
 }
@@ -8278,29 +8453,34 @@ function bulkCancelStocks(){
   const stocks=loadData('stocks');
   // 출고완료 잠긴 항목 필터
   const deliveries=loadData('deliveries');
+  let lockedIn=0;
   const targets=idxs.filter(function(i){
     const s=stocks[i];
     if(!s||s.status!=='입고완료') return false;
+    if(isMonthClosed(s.date)){ lockedIn++; return false; } // 마감된 달의 입고는 취소하지 않음
     return true;
   });
-  const skipped=idxs.length-targets.length;
-  if(!targets.length){alert('취소 가능한 항목(입고완료 상태)이 없습니다.\n미입고 항목은 대상이 아닙니다.');return;}
+  const skipped=idxs.length-targets.length-lockedIn;
+  if(!targets.length){alert(lockedIn?'🔒 마감된 달의 입고는 취소할 수 없습니다.':'취소 가능한 항목(입고완료 상태)이 없습니다.\n미입고 항목은 대상이 아닙니다.');return;}
   const lines=targets.map(function(i){return '- '+(stocks[i].client||'')+' '+stocks[i].product+' ('+(+stocks[i].qty||0).toLocaleString()+'매)';}).join('\n');
-  if(!confirm(targets.length+'건 입고를 취소합니다.\n미입고로 되돌아갑니다.\n\n'+lines+(skipped?'\n\n※ 미입고 '+skipped+'건은 제외됨':'')+ '\n\n계속하시겠습니까?')) return;
+  if(!confirm(targets.length+'건 입고를 취소합니다.\n미입고로 되돌아갑니다.\n\n'+lines+(skipped?'\n\n※ 미입고 '+skipped+'건은 제외됨':'')+(lockedIn?(skipped?'\n':'\n\n')+'※ 마감된 달 '+lockedIn+'건은 제외됨':'')+ '\n\n계속하시겠습니까?')) return;
   targets.forEach(function(idx){
     const item=stocks[idx];
     if(!item) return;
     const sameIdx=stocks.findIndex(function(s,i){
       return i!==idx&&s.fromOrder===item.fromOrder&&s.product===item.product&&s.status==='미입고';
     });
+    const backQty=_stockPlanQty(item);
     if(sameIdx!==-1){
-      stocks[sameIdx].qty=(+stocks[sameIdx].qty||0)+(+item.qty||0);
+      stocks[sameIdx].qty=(+stocks[sameIdx].qty||0)+backQty;
     } else {
-      stocks.push(Object.assign({},item,{status:'미입고',date:item.date,receivedQty:0,inNo:''}));
+      const rec=Object.assign({},item,{status:'미입고',date:item.date,receivedQty:0,inNo:'',qty:backQty});
+      delete rec.overQty;
+      stocks.push(rec);
     }
     stocks.splice(idx,1);
   });
-  saveData('stocks',stocks);
+  if(saveData('stocks',stocks)===false) return; // 읽기 전용(뷰어) 권한: 저장되지 않음 — 완료 안내를 띄우지 않음
   renderAll();
   alert('✅ '+targets.length+'건 입고 취소 완료 (미입고로 되돌림)');
 }
@@ -8311,28 +8491,34 @@ function bulkCancelDeliveries(){
   if(!checked.length){alert('취소할 항목을 먼저 체크해주세요.');return;}
   const idxs=[...new Set(checked.map(function(c){return +c.dataset.idx;}))].sort(function(a,b){return b-a;});
   const orders=loadData('orders');
-  const targets=idxs.filter(function(i){return orders[i]&&(orders[i].outQty||0)>0;});
-  const skipped=idxs.length-targets.length;
-  if(!targets.length){alert('취소 가능한 항목(출고된 수량 있음)이 없습니다.');return;}
-  const lines=targets.map(function(i){return '- '+orders[i].client+' '+orders[i].product+' (출고 '+(orders[i].outQty||0).toLocaleString()+'매)';}).join('\n');
-  if(!confirm(targets.length+'건 출고를 취소합니다.\n출고수량이 0으로 초기화됩니다.\n\n'+lines+(skipped?'\n\n※ 미출고 '+skipped+'건은 제외됨':'')+ '\n\n계속하시겠습니까?')) return;
+  // 마감된 달의 수주, 그리고 출고가 모두 마감된 달 날짜인 수주는 취소 대상에서 뺌.
+  // 출고 가운데 일부만 마감된 달이면 그 출고는 남기고 나머지(열린 달)만 취소 (예전에는 수주일의 달도 확인하지 않고 전부 지웠음)
+  const _dAll=loadData('deliveries');
+  const _keepOf=function(o){ return _dAll.filter(function(d){ return d&&d.orderNum===o.num&&isMonthClosed(d.date); }); };
+  const _allLocked=function(o){ if(isMonthClosed(o.date)) return true; var n=0,k=0; _dAll.forEach(function(d){ if(d&&d.orderNum===o.num){ n++; if(isMonthClosed(d.date)) k++; } }); return n>0&&k===n; };
+  const lockedCnt=idxs.filter(function(i){return orders[i]&&(orders[i].outQty||0)>0&&_allLocked(orders[i]);}).length;
+  const targets=idxs.filter(function(i){return orders[i]&&(orders[i].outQty||0)>0&&!_allLocked(orders[i]);});
+  const skipped=idxs.length-targets.length-lockedCnt;
+  if(!targets.length){alert(lockedCnt?'🔒 마감된 달의 수주·출고는 취소할 수 없습니다.':'취소 가능한 항목(출고된 수량 있음)이 없습니다.');return;}
+  let anyKept=false;
+  const lines=targets.map(function(i){ var kq=_keepOf(orders[i]).reduce(function(a,d){ return a+(+d.qty||0); },0); if(kq) anyKept=true; return '- '+orders[i].client+' '+orders[i].product+' (출고 '+(orders[i].outQty||0).toLocaleString()+'매'+(kq?' 중 마감된 달 '+kq.toLocaleString()+'매는 그대로 둠':'')+')';}).join('\n');
+  if(!confirm(targets.length+'건 출고를 취소합니다.\n'+(anyKept?'마감된 달의 출고는 그대로 두고, 그 밖의 출고를 모두 취소합니다.':'출고수량이 0으로 초기화됩니다.')+'\n\n'+lines+(skipped?'\n\n※ 미출고 '+skipped+'건은 제외됨':'')+(lockedCnt?(skipped?'\n':'\n\n')+'※ 마감된 달 '+lockedCnt+'건은 제외됨':'')+ '\n\n계속하시겠습니까?')) return;
   var allDeliveries=loadData('deliveries');
-  // 취소 대상 출고번호 수집
+  // 취소 대상 출고번호 수집 (남겨 두는 마감된 달 출고의 번호는 제외)
   var cancelledOutNos=[];
   targets.forEach(function(oi){
     const o=orders[oi];
     if(!o) return;
-    if(o.outNo) cancelledOutNos.push(o.outNo);
-    if(Array.isArray(o.outHistory)) o.outHistory.forEach(function(h){ if(h.outNo) cancelledOutNos.push(h.outNo); });
+    const keepNos=_keepOf(o).map(function(d){ return d.outNo; });
+    if(o.outNo&&keepNos.indexOf(o.outNo)===-1) cancelledOutNos.push(o.outNo);
+    if(Array.isArray(o.outHistory)) o.outHistory.forEach(function(h){ if(h.outNo&&keepNos.indexOf(h.outNo)===-1) cancelledOutNos.push(h.outNo); });
   });
   targets.forEach(function(oi){
     const o=orders[oi];
     if(!o) return;
-    orders[oi].outQty=0;
-    delete orders[oi].lastOutDate;
-    delete orders[oi].outNo;
-    delete orders[oi].outHistory;
-    allDeliveries=allDeliveries.filter(function(d){return d.orderNum!==o.num;});
+    const keep=_keepOf(o);
+    _delivApplyCancel(orders[oi],keep);
+    allDeliveries=allDeliveries.filter(function(d){return d.orderNum!==o.num||keep.indexOf(d)!==-1;});
   });
   // 개발비 linkedOutNo 초기화 (취소된 출고번호에 연동된 것)
   var allDevCosts=loadData('devCosts');
@@ -8344,9 +8530,10 @@ function bulkCancelDeliveries(){
       devChanged=true;
     }
   });
-  saveData('orders',orders);
+  const savedOk=saveData('orders',orders)!==false;
   saveData('deliveries',allDeliveries);
   if(devChanged) saveData('devCosts',allDevCosts);
+  if(!savedOk) return; // 읽기 전용(뷰어) 권한: 저장되지 않음 — 완료 안내를 띄우지 않음
   renderAll();
   alert('✅ '+targets.length+'건 출고 취소 완료'+(devChanged?' (연동된 개발비 잠금 해제됨)':''));
 }
@@ -9178,6 +9365,8 @@ function printPO(){
   };
 }
 // ════ 입고 처리 ════
+// 입고 예정(계획) 수량 = 기록된 수량 − 초과 입고분 (초과 입고 기록이 없으면 기록된 수량 그대로)
+function _stockPlanQty(s){ var q=+(s&&s.qty)||0, ov=+(s&&s.overQty)||0; return (ov>0&&ov<q)?q-ov:q; }
 function completeStock(idx){
   const stocks=loadData('stocks');
   const item=stocks[idx];
@@ -9254,8 +9443,11 @@ function _showStockPopup(targets, stocks){
     const linkedPO=getLinkedPO(s);
     // 발주수량: 연결된 PO의 qty 사용 (없으면 stock qty 폴백)
     const poQty=linkedPO?(+linkedPO.qty||0):(+s.qty||0);
-    const receivedQty=+s.receivedQty||0;
-    const remaining=Math.max(0,poQty-receivedQty);
+    // 잔여수량 = 이 입고 대기 건의 수량 (기본값·초과 확인·저장 모두 같은 기준).
+    //  · 예전에는 '발주수량 − 이 건의 입고수량'이라 부분 입고 뒤 남은 건도 발주수량 전체로 보였고, 그 기본값 그대로 입고하면 수량이 부풀고 음수 대기 건이 생겼음
+    //  · 수량이 0 이하로 망가진 대기 건은 발주수량에서 이미 입고된 수량을 뺀 값으로 보여줌
+    const recvdQty=linkedPO?stocks.filter(function(x){return x!==s&&x.status==='입고완료'&&x.fromOrder===s.fromOrder&&x.product===s.product;}).reduce(function(a,x){return a+_stockPlanQty(x);},0):0;
+    const remaining=((+s.qty||0)>0)?(+s.qty):Math.max(0,poQty-recvdQty);
     const expectedVendor=linkedPO?(linkedPO.vendor||''):'';
     rows+=`<tr>
       <td class="rt-client" data-l="거래처" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px">${_ddEsc(s.client||'-')}</td>
@@ -9281,8 +9473,8 @@ function _showStockPopup(targets, stocks){
       <td data-l="발주수량" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;font-weight:600">${poQty.toLocaleString()}</td>
       <td data-l="잔여" style="padding:8px 6px;border-bottom:1px solid #eee;font-size:12px;text-align:center;color:#E65100">${remaining.toLocaleString()}</td>
       <td class="rt-input" data-l="입고수량" style="padding:8px 6px;border-bottom:1px solid #eee">
-        <input type="number" id="stk_qty_${i}" value="${remaining}" min="1" max="${poQty}" inputmode="numeric"
-          data-poqty="${poQty}"
+        <input type="number" id="stk_qty_${i}" value="${remaining}" min="1" inputmode="numeric"
+          data-poqty="${poQty}" data-remain="${remaining}"
           style="width:90px;padding:5px 8px;border:2px solid #00695C;border-radius:5px;font-size:12px;font-weight:700;text-align:right">
       </td>
     </tr>`;
@@ -9292,7 +9484,7 @@ function _showStockPopup(targets, stocks){
     <div class="pop-fixed" style="background:#fff;border-radius:12px;padding:20px 24px;min-width:640px;max-width:92vw;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
       <div style="font-size:15px;font-weight:700;color:#00695C;margin-bottom:12px;flex-shrink:0">📦 입고 수량 확인 <span style="font-size:11px;color:#888;font-weight:400">· ${targets.length}건</span></div>
       <div data-popup-body style="overflow-y:auto;flex:1 1 auto;min-height:0">
-      <div style="font-size:11px;color:#666;margin-bottom:12px">※ 입고처가 발주처와 다를 경우 경고가 표시됩니다. 수량을 확인 후 입고처리하세요.</div>
+      <div style="font-size:11px;color:#666;margin-bottom:12px">※ 입고처가 발주처와 다를 경우 경고가 표시됩니다. 수량을 확인 후 입고처리하세요. 발주수량보다 많이 들어왔으면 실제 입고수량을 그대로 넣으면 됩니다.</div>
       <table class="resp-tbl" style="width:100%;border-collapse:collapse;margin-bottom:16px">
         <thead>
           <tr style="background:#00695C;color:#fff">
@@ -9412,19 +9604,22 @@ function _showStockPopup(targets, stocks){
       return parseInt(document.getElementById('stk_qty_'+i).value)||0;
     });
 
-    // 유효성 검사 (발주수량 기준)
+    // 유효성 검사 — 남은 입고 예정 수량(잔여)보다 많이 들어온 경우(초과 입고)는 막지 않고 확인만 받음
+    const overIn=[];
     for(let i=0;i<targets.length;i++){
       const qtyInput=document.getElementById('stk_qty_'+i);
-      const poQty=qtyInput?+(qtyInput.getAttribute('data-poqty')||0):(+targets[i].item.qty||0);
+      const remainQty=qtyInput?+(qtyInput.getAttribute('data-remain')||0):(+targets[i].item.qty||0);
       if(inputQtys[i]<=0){alert('입고수량은 1 이상이어야 합니다: '+targets[i].item.product);return;}
-      if(inputQtys[i]>poQty){alert('입고수량이 발주수량을 초과합니다: '+targets[i].item.product);return;}
+      if(inputQtys[i]>remainQty) overIn.push('· '+targets[i].item.product+' : 잔여 '+remainQty.toLocaleString()+'매 → 입고 '+inputQtys[i].toLocaleString()+'매 (+'+(inputQtys[i]-remainQty).toLocaleString()+')');
     }
+    if(overIn.length&&!confirm('아래 품목은 남은 입고 예정 수량(잔여)보다 많이 입고됩니다.\n\n'+overIn.join('\n')+'\n\n초과 수량도 재고·매입에 잡힙니다. 계속할까요?')) return;
 
     document.body.removeChild(overlay);
 
     const allStocks=loadData('stocks');
     const today_=today();
     const newItems=[];
+    let skippedIn=0; const skippedAt={};
     // 이번 입고 배치에 공통으로 쓸 입고번호 생성
     const batchInNo=generateInNo();
 
@@ -9432,9 +9627,15 @@ function _showStockPopup(targets, stocks){
       const inputQty=inputQtys[i];
       const totalQty=+t.item.qty||0;
       const pi=t.idx;
+      // 창이 떠 있는 동안 목록이나 수량이 바뀌었으면(다른 기기 동기화) 다른 건을 건드리지 않게 건너뜀
+      const cur=allStocks[pi];
+      if(!cur||cur.status!=='미입고'||(cur!==t.item&&(!cur._id||cur._id!==t.item._id))||(+cur.qty||0)!==totalQty){ skippedIn++; skippedAt[i]=1; return; }
+      // 입고 대기 건에는 초과 입고 기록이 있을 수 없음 (예전 버전 기기에서 입고취소한 흔적이면 지우고 진행)
+      if(cur.overQty!==undefined) delete cur.overQty;
 
-      if(inputQty===totalQty){
-        // 전체 입고
+      if(inputQty>=totalQty){
+        // 전체 입고 — 예정보다 많이 들어왔으면 실제 수량으로 기록하고 초과분은 overQty 에 남김 (입고취소 때 원래 예정 수량으로 복원)
+        if(inputQty>totalQty){ if(totalQty>0) allStocks[pi].overQty=(+allStocks[pi].overQty||0)+(inputQty-totalQty); allStocks[pi].qty=inputQty; }
         allStocks[pi].status='입고완료';
         allStocks[pi].date=today_;
         allStocks[pi].receivedQty=(+allStocks[pi].receivedQty||0)+inputQty;
@@ -9459,7 +9660,9 @@ function _showStockPopup(targets, stocks){
     });
 
     newItems.forEach(function(item){ allStocks.push(item); });
-    saveData('stocks',allStocks);
+    // 전부 건너뛰었으면 저장하지 않고 안내만
+    if(skippedIn===targets.length){ renderAll(); alert('⚠️ 그 사이 입고 목록이 바뀌어 처리하지 못했습니다.\n입고관리 목록을 확인한 뒤 다시 시도해주세요.'); return; }
+    if(saveData('stocks',allStocks)===false) return; // 읽기 전용(뷰어) 권한: 저장되지 않음 — 완료 안내를 띄우지 않음
     // 목형·인쇄판 사용횟수 자동 증가 (입고 = 생산 완료)
     var _toolHits=0;
     try{
@@ -9468,17 +9671,91 @@ function _showStockPopup(targets, stocks){
         var it=t.item||{}; var cl=it.client||'';
         if(!cl&&it.fromOrder){ var _o=_ordersForTool.find(function(o){ return o.num===it.fromOrder; }); if(_o) cl=_o.client||''; }
         return {client:cl,product:it.product||'',qty:inputQtys[i]};
-      }),today_,batchInNo);
+      }).filter(function(x,i){ return !skippedAt[i]; }),today_,batchInNo);
     }catch(e){ console.warn('tool usage',e); }
     renderAll();
-    alert('✅ '+targets.length+'개 항목 입고처리 완료! (입고번호: '+batchInNo+')'+(_toolHits?'\n🛠️ 연결된 목형·인쇄판 '+_toolHits+'개 사용횟수 +1':''));
+    alert('✅ '+(targets.length-skippedIn)+'개 항목 입고처리 완료! (입고번호: '+batchInNo+')'+(skippedIn?'\n⚠️ 그 사이 목록이 바뀌어 '+skippedIn+'건은 처리하지 못했습니다. 다시 시도해주세요.':'')+(_toolHits?'\n🛠️ 연결된 목형·인쇄판 '+_toolHits+'개 사용횟수 +1':''));
   };
+}
+
+// 같은 수주·품목에 남아 있는 미입고 수량 (수량이 0 이하로 망가진 대기 건은 세지 않음).
+//  samePo=true 면 같은 발주번호의 남은 수량만 (부분 입고 뒤 남은 건 — 그 줄에서 바로 입고처리할 수 있음),
+//  samePo=false 면 그 밖의 것만 (분할 발주의 다른 발주분 · 아직 발주 전인 잔량)
+function _stockPendingQty(stocks,s,samePo){
+  if(!s||!s.fromOrder) return 0;
+  return (stocks||[]).filter(function(x){ return x&&x!==s&&x.status==='미입고'&&x.fromOrder===s.fromOrder&&x.product===s.product&&(((x.poNum||'')===(s.poNum||''))===!!samePo); }).reduce(function(a,x){ return a+Math.max(0,+x.qty||0); },0);
+}
+// ════ 입고 수량 추가 (입고완료 건) ════
+//  이미 입고처리한 건에 나중에 더 들어온 수량을 더함 — 입고일·입고번호는 그대로 (입고취소 후 다시 입고하면 입고일이 오늘로 바뀌므로 따로 둠).
+//  더한 수량은 초과 입고(overQty)로 기록되어, 입고취소하면 원래 예정 수량으로 되돌아감
+function addStockQty(idx){
+  const stocks=loadData('stocks');
+  const s=stocks[idx];
+  if(!s||s.status!=='입고완료') return;
+  if(isMonthClosed(s.date)){ alert('🔒 마감된 달의 입고는 수량을 추가할 수 없습니다.'); return; }
+  const curQty=+s.qty||0;
+  // 같은 발주의 미입고가 남아 있으면 [＋수량]을 쓰지 않음 — 더 들어온 것은 그 미입고 줄의 [입고처리]에 넣어야 수량이 두 번 잡히지 않음
+  const pend=_stockPendingQty(stocks,s,true);
+  if(pend>0){ alert('이 품목은 아직 미입고 '+pend.toLocaleString()+'매가 남아 있습니다.\n\n더 들어온 수량은 그 미입고 줄의 [입고처리]에 넣어주세요.\n(남은 수량보다 많이 들어왔으면 실제 수량을 그대로 넣으면 됩니다)'); return; }
+  const pendOther=_stockPendingQty(stocks,s,false);
+  const overlay=document.createElement('div');
+  overlay.className='dyn-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML=''
+    +'<div style="background:#fff;border-radius:12px;padding:20px 22px;width:420px;max-width:92vw;max-height:90vh;overflow-y:auto;box-sizing:border-box;box-shadow:0 8px 32px rgba(0,0,0,0.3)">'
+      +'<div style="font-size:15px;font-weight:700;color:#00695C;margin-bottom:10px">➕ 입고 수량 추가</div>'
+      +'<div style="font-size:12px;color:#333;line-height:1.7;margin-bottom:12px;padding:8px 10px;background:#F1F8F6;border-radius:8px">'
+        +'<div><b>'+_ddEsc(s.client||'-')+'</b> · '+_ddEsc(s.product||'-')+'</div>'
+        +'<div style="color:#666">입고일 '+_ddEsc(s.date||'-')+' · 입고번호 '+_ddEsc(s.inNo||'-')+'</div>'
+        +'<div>지금 입고수량 <b>'+curQty.toLocaleString()+'</b>매'+((+s.overQty||0)>0?' <span style="color:#C62828">(초과 +'+(+s.overQty).toLocaleString()+' 포함)</span>':'')+'</div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        +'<label for="stk_add_qty" style="font-size:12px;font-weight:700;color:#555;white-space:nowrap">더 들어온 수량</label>'
+        +'<input type="number" id="stk_add_qty" min="1" inputmode="numeric" placeholder="0" style="width:120px;padding:7px 10px;border:2px solid #00695C;border-radius:6px;font-size:14px;font-weight:700;text-align:right">'
+        +'<span style="font-size:12px;color:#555">매</span>'
+        +'<span id="stk_add_sum" style="font-size:12px;color:#00695C;font-weight:700"></span>'
+      +'</div>'
+      +'<div style="font-size:11px;color:#666;line-height:1.6;margin-top:10px">※ 입고일·입고번호는 그대로 두고 수량만 더합니다. 더한 수량은 재고·매입에 잡히고, 그만큼 수주수량보다 많이 출고할 수 있습니다.</div>'
+      +(pendOther>0?'<div style="font-size:11px;color:#E65100;line-height:1.6;margin-top:6px">⚠️ 이 수주에는 아직 입고되지 않은 다른 발주분 '+pendOther.toLocaleString()+'매가 남아 있습니다. 그 발주분이 들어온 것이면 여기 말고 그 줄에서 입고처리하세요.</div>':'')
+      +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">'
+        +'<button id="stk_add_cancel" style="padding:9px 20px;background:#888;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">취소</button>'
+        +'<button id="stk_add_ok" style="padding:9px 20px;background:#00695C;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">➕ 수량 추가</button>'
+      +'</div>'
+    +'</div>';
+  document.body.appendChild(overlay);
+  const inp=document.getElementById('stk_add_qty'), sumEl=document.getElementById('stk_add_sum');
+  inp.addEventListener('input',function(){ const n=parseInt(inp.value)||0; sumEl.textContent=n>0?('→ 입고수량 '+(curQty+n).toLocaleString()+'매'):''; });
+  const close=function(){ if(overlay.parentElement) overlay.parentElement.removeChild(overlay); };
+  document.getElementById('stk_add_cancel').onclick=close;
+  document.getElementById('stk_add_ok').onclick=function(){
+    const n=parseInt(inp.value)||0;
+    if(n<=0){ alert('더 들어온 수량을 1 이상으로 입력해주세요.'); return; }
+    if(n>999999){ alert('수량이 너무 큽니다 (한 번에 999,999매까지). 다시 확인해주세요.'); return; }
+    if(n>curQty&&!confirm('더하는 수량('+n.toLocaleString()+'매)이 지금 입고수량('+curQty.toLocaleString()+'매)보다 많습니다.\n맞게 넣으셨나요?')) return;
+    const all=loadData('stocks');
+    const cur=all[idx];
+    // 창이 떠 있는 동안 목록이 바뀌었으면(다른 기기 동기화·입고취소 등) 다른 건을 건드리지 않게 그만둠
+    if(!cur||cur.status!=='입고완료'||(cur!==s&&(!cur._id||cur._id!==s._id))||(+cur.qty||0)!==curQty){ close(); renderAll(); alert('⚠️ 그 사이 입고 목록이 바뀌어 처리하지 못했습니다.\n입고관리 목록을 확인한 뒤 다시 시도해주세요.'); return; }
+    if(isMonthClosed(cur.date)){ close(); alert('🔒 마감된 달의 입고는 수량을 추가할 수 없습니다.'); return; }
+    if(_stockPendingQty(all,cur,true)>0){ close(); renderAll(); alert('그 사이 이 품목에 미입고 줄이 생겼습니다.\n더 들어온 수량은 그 미입고 줄의 [입고처리]에 넣어주세요.'); return; }
+    const po2=_stockPendingQty(all,cur,false);
+    if(po2>0&&!confirm('이 수주에는 아직 입고되지 않은 다른 발주분 '+po2.toLocaleString()+'매가 남아 있습니다.\n그 발주분이 들어온 것이면 [취소]를 누르고 그 줄에서 입고처리하세요.\n\n이 입고에 따로 더 들어온 수량이 맞습니까?')) return;
+    cur.qty=curQty+n;
+    cur.overQty=(+cur.overQty||0)+n;
+    cur.receivedQty=(+cur.receivedQty||0)+n;
+    close();
+    if(saveData('stocks',all)===false) return; // 읽기 전용(뷰어) 권한: 저장되지 않음
+    renderAll();
+    try{ showInfoToast('➕ '+(cur.product||'')+' 입고수량 +'+n.toLocaleString()+'매 → '+(+cur.qty).toLocaleString()+'매 (입고번호 '+(cur.inNo||'-')+')','#00695C'); }catch(e){}
+  };
+  setTimeout(function(){ try{ inp.focus(); }catch(e){} },60);
 }
 
 function cancelStock(idx){
   const stocks=loadData('stocks');
   const item=stocks[idx];
   if(!item||item.status!=='입고완료') return;
+  // 마감된 달의 입고는 취소하지 않음 (목록의 버튼은 숨겨져 있지만 함수에서도 한 번 더 확인)
+  if(isMonthClosed(item.date)){ alert('🔒 마감된 달의 입고는 취소할 수 없습니다.'); return; }
 
   const msg='입고완료 항목을 취소합니다.\n'
     +'품명: '+item.product+'\n'
@@ -9494,17 +9771,22 @@ function cancelStock(idx){
       && s.status==='미입고';
   });
 
+  // 발주수량보다 많이 입고했던 건은 취소하면 원래 예정 수량으로 되돌림 (초과분은 미입고로 남기지 않음)
+  const backQty=_stockPlanQty(item);
   if(sameIdx!==-1){
     // 기존 미입고 항목에 수량 합산
-    stocks[sameIdx].qty=(+stocks[sameIdx].qty||0)+(+item.qty||0);
+    stocks[sameIdx].qty=(+stocks[sameIdx].qty||0)+backQty;
   } else {
     // 새 미입고 항목 생성
-    stocks.push(Object.assign({},item,{
+    const rec=Object.assign({},item,{
       status:'미입고',
       date:item.date,
       receivedQty:0,
-      inNo:''
-    }));
+      inNo:'',
+      qty:backQty
+    });
+    delete rec.overQty;
+    stocks.push(rec);
   }
 
   // 원래 입고완료 항목 제거
@@ -15014,7 +15296,7 @@ function handleScanCode(text){
   setTimeout(function(){
     var sEl=document.getElementById('del_search'); if(sEl){ sEl.value=o.num; if(typeof renderDelivery==='function') renderDelivery(); }
     var remain=(+(o.qty||0))-(+(o.outQty||0));
-    if(o.status==='출고완료'||remain<=0){ alert('수주 '+o.num+' ('+o.client+' · '+o.product+')은 이미 출고완료 상태입니다.'); return; }
+    if((o.status==='출고완료'||remain<=0)&&_delivShippable(o)<=0){ alert('수주 '+o.num+' ('+o.client+' · '+o.product+')은 이미 출고완료 상태입니다.'); return; }
     if(isMonthClosed(today())){ alert('🔒 이번 달은 마감되어 출고처리를 할 수 없습니다.'); return; }
     if(typeof _showDeliveryPopup==='function') _showDeliveryPopup([{order:o,idx:idx}],orders,loadData('stocks'));
     else alert('출고 화면을 열 수 없습니다.');
@@ -17037,12 +17319,39 @@ function runDataHealth(){
               dupNum(orders,'num').map(function(v){ return {label:'수주번호 '+v,go:{tab:'tab_order',search:v}}; }),
               dupNum(pos.filter(function(p){ return p.num; }),'num').map(function(v){ return {label:'발주번호 '+v,go:{tab:'tab_po',search:v}}; }),
               dupNum(deliveries,'outNo').map(function(v){ return {label:'출고번호 '+v,go:{tab:'tab_delivery',search:v}}; })));
-  // 5. 출고수량 불일치 (수주.outQty ≠ 출고 합계) / 초과
+  // 5. 출고수량 불일치 (수주.outQty ≠ 출고 합계)
+  //    · 수주수량보다 많이 출고한 것은 입고된 만큼 확인받고 넣은 정상 기록(초과 납품)이므로 오류로 보지 않음
+  //      — 잘못된 초과는 아래 5-2(입고보다 많이 출고) · 5-3(같은 출고번호에 같은 수주가 두 줄)에서 잡음
   var outSum={}; deliveries.forEach(function(d){ if(d.orderNum) outSum[d.orderNum]=(outSum[d.orderNum]||0)+(+d.qty||0); });
+  var recvSum={}, hasStock={}; stocks.forEach(function(s){ if(!s||!s.fromOrder) return; hasStock[s.fromOrder]=1; if(s.status==='입고완료') recvSum[s.fromOrder]=(recvSum[s.fromOrder]||0)+(+s.qty||0); });
   var mism=[];
-  orders.forEach(function(o){ var sum=outSum[o.num]||0, oq=+o.outQty||0; if(sum!==oq||oq>(+o.qty||0)) mism.push({o:o,sum:sum}); });
-  add('outqty_mismatch','err','수주 출고수량 불일치','수주에 기록된 출고수량과 출고(납품) 기록 합계가 다르거나 수주수량을 초과합니다. 재고·매출에 영향을 줍니다.',
-    mism.map(function(x){ return {label:x.o.num+' '+x.o.client+' · '+x.o.product+' — 수주 '+(+x.o.qty||0).toLocaleString()+' / 기록 출고 '+(+x.o.outQty||0).toLocaleString()+' / 출고합계 '+x.sum.toLocaleString(),go:{tab:'tab_order',search:x.o.num},fix:{type:'fixOutQty',num:x.o.num,sum:x.sum}}; }),'출고합계로 보정');
+  orders.forEach(function(o){ var sum=outSum[o.num]||0, oq=+o.outQty||0; if(sum!==oq) mism.push({o:o,sum:sum}); });
+  add('outqty_mismatch','err','수주 출고수량 불일치','수주에 기록된 출고수량과 출고(납품) 기록 합계가 다릅니다. 재고·매출에 영향을 줍니다. [출고합계로 보정] 버튼이 없는 건은 출고 기록 합계가 수주·입고 수량보다 많은 경우로, 출고 기록이 중복됐을 수 있으니 납기관리에서 먼저 확인하세요.',
+    mism.map(function(x){
+      var it={label:x.o.num+' '+x.o.client+' · '+x.o.product+' — 수주 '+(+x.o.qty||0).toLocaleString()+' / 기록 출고 '+(+x.o.outQty||0).toLocaleString()+' / 출고합계 '+x.sum.toLocaleString(),go:{tab:'tab_order',search:x.o.num}};
+      // 출고 기록 합계가 수주수량·입고완료 수량보다 많으면 '합계로 보정'을 권하지 않음 (중복 출고 기록일 수 있어, 보정하면 잘못된 수량이 그대로 굳음)
+      if(x.sum<=Math.max(+x.o.qty||0,recvSum[x.o.num]||0)) it.fix={type:'fixOutQty',num:x.o.num,sum:x.sum};
+      return it;
+    }),'출고합계로 보정');
+  // 5-2. 입고완료 수량보다 많이 출고된 수주 — 출고처리 창에서는 막히지만, 출고 뒤 입고취소·출고 수정·예전 중복 출고로 생길 수 있음.
+  //      입고완료가 일부라도 있는 수주는 '주의', 입고완료가 하나도 없는 수주(입고처리를 건너뛴 옛 자료일 수 있음)는 '정보'로 따로 표시
+  var overStk=orders.filter(function(o){ return o.num&&hasStock[o.num]&&Math.max(outSum[o.num]||0,+o.outQty||0)>(recvSum[o.num]||0); });
+  var overStkItem=function(o){ var ot=Math.max(outSum[o.num]||0,+o.outQty||0), rc=recvSum[o.num]||0; return {label:o.num+' '+(o.client||'')+' · '+(o.product||'')+' — 입고완료 '+rc.toLocaleString()+' / 출고 '+ot.toLocaleString()+' (+'+(ot-rc).toLocaleString()+')',go:{tab:'tab_delivery',search:o.num}}; };
+  add('out_over_stock','warn','입고완료 수량보다 많이 출고된 수주','출고 수량이 입고완료 수량보다 많습니다 (그만큼 재고가 맞지 않습니다). 출고한 뒤 입고취소를 했거나, 출고 수정에서 수량을 잘못 넣었거나, 예전 버전의 중복 출고일 수 있습니다. 입고관리·납기관리에서 실제 수량을 확인하세요.',
+    overStk.filter(function(o){ return recvSum[o.num]!==undefined; }).map(overStkItem));
+  add('out_no_stock','info','입고완료 없이 출고된 수주','입고완료 기록이 하나도 없는데 출고된 수주입니다 (입고처리를 건너뛴 예전 자료이거나, 출고한 뒤 입고취소한 경우). 재고시트에는 출고 초과로 잡힙니다. 최근 것이면 입고관리에서 입고처리를 해주세요.',
+    overStk.filter(function(o){ return recvSum[o.num]===undefined; }).map(overStkItem));
+  // 5-3. 같은 출고번호에 같은 수주가 두 줄 이상 — 예전 버전에서 나눠 출고한 수주를 한꺼번에 체크해 출고하면 같은 출고가 두 번 저장되던 오류의 흔적 (지금은 생기지 않음)
+  var dupLine={}; deliveries.forEach(function(d){ if(!d||!d.outNo||!d.orderNum||!((+d.qty||0)>0)) return; var k=d.outNo+'‖'+d.orderNum; (dupLine[k]=dupLine[k]||[]).push(d); }); // 수량 0 인 줄은 세지 않음 (출고 수정에서 0 으로 고친 줄)
+  var ordByNum={}; orders.forEach(function(o){ if(o&&o.num) ordByNum[o.num]=o; });
+  add('deliv_dup_line','warn','같은 출고번호에 같은 수주가 두 번 들어간 출고','예전 버전에서 여러 번 나눠 출고한 수주를 한꺼번에 체크해 출고하면 같은 출고가 두 번 저장되는 오류가 있었습니다 (매출이 두 번 잡힘). 실제로 한 번만 나간 것이면 [중복 줄 지우기]로 한 줄을 지우세요. 버튼이 없는 건(세 줄 이상 · 수량이나 날짜가 다른 줄)은 납기관리의 ✏️ 수정에서 남길 줄만 두고 나머지 수량을 0 으로 고치면 됩니다. 마감된 달의 출고는 고칠 수 없습니다.',
+    Object.keys(dupLine).filter(function(k){ return dupLine[k].length>1; }).map(function(k){
+      var recs=dupLine[k], d0=recs[0], o=ordByNum[d0.orderNum]||null;
+      var it={label:d0.outNo+' '+((o&&o.client)||d0.client||'')+' · '+((o&&o.product)||d0.product||'')+' — 수주 '+d0.orderNum+' 이(가) '+recs.length+'줄 ('+recs.map(function(r){ return (+r.qty||0).toLocaleString(); }).join(' + ')+'매)',go:{tab:'tab_delivery',search:d0.orderNum}};
+      // 두 줄이고 수량·출고일이 같을 때만 바로 지울 수 있게 함 (예전 오류가 만든 모양 그대로 · 마감된 달의 출고는 제외)
+      if(o&&recs.length===2&&(+recs[0].qty||0)===(+recs[1].qty||0)&&(recs[0].date||'')===(recs[1].date||'')&&!isMonthClosed(recs[0].date)) it.fix={type:'dropDupDelivery',outNo:d0.outNo,orderNum:d0.orderNum,qty:+recs[0].qty||0};
+      return it;
+    }),'중복 줄 지우기');
   // 6. 출고가 가리키는 수주 없음
   var onums={}; orders.forEach(function(o){ onums[o.num]=1; });
   add('orphan_delivery','warn','수주가 없는 출고 기록','출고(납품)의 수주번호에 해당하는 수주가 없습니다 (수주 삭제 후 남은 기록). 매출원장에는 계산되지만 재고 차감은 거래처·품명으로만 됩니다.',
@@ -17060,6 +17369,9 @@ function runDataHealth(){
   // 8. 입고완료인데 입고일/입고번호 누락
   add('stock_incomplete','info','입고완료 항목의 입고일·입고번호 누락','선입선출 로트 계산과 입고 검색에 쓰이는 값입니다.',
     stocks.filter(function(s){ return s.status==='입고완료'&&(!isYmd(s.date)||!s.inNo); }).map(function(s){ return {label:(s.client||'')+' · '+(s.product||'')+' '+(+s.qty||0).toLocaleString()+'매 (입고일 '+(s.date||'없음')+' / 번호 '+(s.inNo||'없음')+')',go:{tab:'tab_stock',search:s.poNum||s.fromOrder||s.product}}; }));
+  // 8-2. 입고 대기 수량이 0 이하인 기록 — 예전 버전에서 부분 입고 뒤 남은 건을 기본값(발주수량 전체)으로 다시 입고처리하면 생기던 오류의 흔적
+  add('stock_bad_qty','warn','입고 대기 수량이 0 이하인 기록','예전 버전에서 부분 입고 뒤 남은 수량을 다시 입고처리할 때 생긴 오류일 수 있습니다(입고완료 수량이 실제보다 많이 잡힘). 입고관리에서 같은 수주의 마지막 입고를 [입고취소]한 뒤 다시 입고처리하면 바로잡힙니다.',
+    stocks.filter(function(s){ return s.status==='미입고'&&!((+s.qty||0)>0); }).map(function(s){ return {label:(s.client||'')+' · '+(s.product||'')+' — 미입고 '+(+s.qty||0).toLocaleString()+'매 (수주 '+(s.fromOrder||'-')+')',go:{tab:'tab_stock',search:s.fromOrder||s.product}}; }));
   // 9. 마스터 정보 미완성 (단가 0 · 치수 없음)
   add('master_incomplete','info','제품마스터 정보 미완성 (단가 0 또는 치수 없음)','단가가 없으면 매출·미수금이 0으로, 치수가 없으면 원가·인상 영향표 계산이 빠집니다.',
     master.filter(function(m){ return !(+m.price>0)||!(m.jang&&m.pok&&m.go); }).map(function(m){ return {label:(m.code||'')+' '+(m.client||'')+' · '+(m.product||'')+' — '+(!(+m.price>0)?'단가 없음 ':'')+(!(m.jang&&m.pok&&m.go)?'치수 없음':''),go:{tab:'tab_master',search:m.code||m.product}}; }));
@@ -17100,6 +17412,25 @@ function healthFix(issueId,itemIdx){
     if(!confirm(f.num+' 의 출고수량을 출고 기록 합계('+f.sum.toLocaleString()+'매)로 맞출까요?')) return;
     o2.outQty=f.sum; var tq=+o2.qty||0; if(f.sum>=tq&&tq>0) o2.status='출고완료'; else if(o2.status==='출고완료') o2.status='접수';
     saveData('orders',orders); showInfoToast('✅ '+f.num+' 출고수량 보정 완료','#2E7D32');
+  } else if(f.type==='dropDupDelivery'){
+    // 같은 출고번호에 같은 수주가 같은 수량으로 두 줄 → 뒤의 한 줄을 지움 (운반비는 남는 줄로 옮김)
+    var dels=loadData('deliveries'), ords=loadData('orders');
+    var ixs=[]; dels.forEach(function(d,i){ if(d&&d.outNo===f.outNo&&d.orderNum===f.orderNum&&(+d.qty||0)>0) ixs.push(i); });
+    if(ixs.length!==2||(+dels[ixs[0]].qty||0)!==f.qty||(+dels[ixs[1]].qty||0)!==f.qty||(dels[ixs[0]].date||'')!==(dels[ixs[1]].date||'')){ alert('그 사이 출고 기록이 바뀌었습니다. [다시 검진]을 눌러주세요.'); return; }
+    if(isMonthClosed(dels[ixs[0]].date)){ alert('🔒 마감된 달의 출고는 고칠 수 없습니다.'); return; }
+    var o3=ords.find(function(x){ return x&&x.num===f.orderNum; }); if(!o3) return;
+    var oldSum=dels.reduce(function(a,d){ return a+((d&&d.orderNum===f.orderNum)?(+d.qty||0):0); },0), newSum=oldSum-f.qty;
+    // 그 달 세금계산서를 이미 [발행완료]로 표시한 거래처면 금액이 달라진다는 것을 함께 알림
+    var invNote='';
+    try{ var _dym=String(dels[ixs[0]].date||'').substring(0,7), _dinv=loadData('invoices'); if(_dym&&Array.isArray(_dinv)&&_dinv.some(function(v){ return v&&v.status==='발행완료'&&v.ym===_dym&&v.client===(dels[ixs[0]].client||o3.client); })) invNote='\n\n🧾 '+_dym.replace('-','년 ')+'월 세금계산서가 이미 [발행완료]로 표시된 거래처입니다 — 지우면 그 달 금액이 발행한 금액과 달라집니다.'; }catch(e){}
+    if(!confirm(f.outNo+' 에 수주 '+f.orderNum+' 이(가) '+f.qty.toLocaleString()+'매씩 두 줄 들어 있습니다.\n한 줄을 지워 이 수주의 출고 기록 합계를 '+oldSum.toLocaleString()+'매 → '+newSum.toLocaleString()+'매로 고칩니다.\n\n(실제로 '+f.qty.toLocaleString()+'매가 두 번 나간 것이면 지우지 마세요)'+invNote+'\n\n지울까요?')) return;
+    var keepRec=dels[ixs[0]], dropRec=dels[ixs[1]];
+    if(+dropRec.freight) keepRec.freight=(+keepRec.freight||0)+(+dropRec.freight||0);
+    dels.splice(ixs[1],1);
+    if(saveData('deliveries',dels)===false) return;
+    // 수주의 출고수량이 '두 줄을 다 더한 합계'로 맞춰져 있었으면 함께 줄임 (이미 한 줄만 반영돼 있었으면 그대로)
+    if((+o3.outQty||0)===oldSum){ o3.outQty=newSum; if(o3.status==='출고완료'&&newSum<(+o3.qty||0)) o3.status='접수'; saveData('orders',ords); }
+    showInfoToast('✅ '+f.outNo+' 의 중복 줄 하나를 지웠습니다 (수주 '+f.orderNum+' 출고 기록 합계 '+newSum.toLocaleString()+'매)','#2E7D32');
   } else if(f.type==='makeStock'){
     var pos=loadData('pos'); var p=pos.find(function(x){ return (f.num?x.num===f.num:true)&&x.fromOrder===f.fromOrder&&x.product===f.product; }); if(!p) return;
     var ord=loadData('orders').find(function(x){ return x.num===p.fromOrder; });
