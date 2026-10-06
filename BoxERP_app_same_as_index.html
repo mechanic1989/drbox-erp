@@ -1079,7 +1079,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.9</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.10</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -8475,9 +8475,220 @@ function poNoteClean(note){
   t=t.replace(/^[\s|,\/\-·]+|[\s|,\/\-·]+$/g,'').replace(/\s*\|\s*\|\s*/g,' | ');
   return t;
 }
+// ════ 발주서 출력 공통 — 출력 방식 선택(이미지/인쇄) · 이미지 미리보기 · 인쇄 창 (거래명세표와 같은 방식) ════
+// 기본 출력 방식: 마지막 선택을 기억 · 처음에는 이미지(JPEG · 예전과 같은 방식)
+function _poOutMode(){
+  var saved=''; try{ saved=store.getItem('po_out_mode')||''; }catch(e){}
+  return (saved==='img'||saved==='print')?saved:'img';
+}
+// 출력 방식 선택 카드 2장 (거래명세표 출력 팝업과 같은 모양)
+function _poModeCardsHtml(defMode){
+  var card=function(val,ico,label,sub){
+    var on=(val===defMode);
+    return '<label class="_po_mode" data-mode="'+val+'" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 6px;border:1.5px solid '+(on?'#1A237E':'#D0D8E4')+';border-radius:8px;font-size:12px;font-weight:700;color:'+(on?'#1A237E':'#555')+';cursor:pointer;background:'+(on?'#E8EAF6':'#fff')+';text-align:center">'
+      +'<input type="radio" name="_po_mode" value="'+val+'" '+(on?'checked':'')+' style="position:absolute;opacity:0;width:0;height:0">'
+      +'<span>'+ico+' '+label+'</span><span style="font-size:10px;font-weight:400;color:#666">'+sub+'</span></label>';
+  };
+  return '<div style="display:flex;gap:8px;position:relative">'
+    +card('img','🖼️','이미지(JPEG)','그림으로 저장 · 폰에서도 됨 · 카톡 전송')
+    +card('print','🖨️','프린터 인쇄','PC에서 새 창으로 바로 인쇄')
+    +'</div>';
+}
+// 카드 선택 표시 연결 → 현재 선택값을 돌려주는 함수를 반환
+function _poBindModeCards(root){
+  var cards=root.querySelectorAll('._po_mode');
+  Array.prototype.forEach.call(cards,function(lb){
+    lb.querySelector('input').addEventListener('change',function(){
+      Array.prototype.forEach.call(cards,function(x){ var on=x.querySelector('input').checked; x.style.borderColor=on?'#1A237E':'#D0D8E4'; x.style.color=on?'#1A237E':'#555'; x.style.background=on?'#E8EAF6':'#fff'; });
+    });
+  });
+  return function(){ var r=root.querySelector('input[name=_po_mode]:checked'); return (r&&r.value)||_poOutMode(); };
+}
+// 출력 방식 선택 팝업 (재출력용) — info:{num,vendor,count}, onOk(mode)
+function _poAskMode(info, onOk){
+  var old=document.getElementById('_po_mode_overlay'); if(old) old.remove();
+  var overlay=document.createElement('div');
+  overlay.id='_po_mode_overlay'; overlay.className='dyn-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:10px';
+  overlay.innerHTML=
+    '<div style="background:#fff;border-radius:12px;padding:22px 24px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.25);text-align:center">'
+    +'<div style="font-size:16px;font-weight:700;color:#1A237E;margin-bottom:6px">📄 발주서 출력</div>'
+    +'<div style="font-size:12px;color:#555;margin-bottom:4px">출력 방식을 고르세요</div>'
+    +'<div style="font-size:11px;color:#888;margin-bottom:10px">'+_ddEsc(info.num||'')+' · '+_ddEsc(info.vendor||'-')+(info.count?' · '+info.count+'건':'')+'</div>'
+    +_poModeCardsHtml(_poOutMode())
+    +'<div style="margin-top:16px"><button id="_po_mode_ok" style="width:100%;padding:11px 0;background:#1A237E;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✅ 발주서 출력</button></div>'
+    +'<div style="margin-top:14px"><button id="_po_mode_cancel" style="font-size:11px;color:#aaa;background:none;border:none;cursor:pointer;text-decoration:underline">취소</button></div>'
+    +'</div>';
+  document.body.appendChild(overlay);
+  var getMode=_poBindModeCards(overlay);
+  function doClose(){ try{ overlay.remove(); }catch(e){} }
+  document.getElementById('_po_mode_cancel').onclick=doClose;
+  document.getElementById('_po_mode_ok').onclick=function(){ var mode=getMode(); doClose(); onOk(mode); };
+}
+// 인쇄용 전체 HTML (새 창) — 이미지와 같은 배치(가로 1400px 기준)를 A4 가로 폭에 맞춰 줄여서 인쇄
+function _poPrintHtml(htmlContent, poNum){
+  var css='', body='';
+  try{
+    var doc=new DOMParser().parseFromString(htmlContent,'text/html');
+    var st=doc.querySelector('style'); css=st?st.textContent:'';
+    var b=doc.querySelector('body'); var np=b&&b.querySelector('.noprint'); if(np) np.remove();
+    if(b){
+      // 인쇄 창에는 문서 내용만 넣음 — 품명·발주처 등에 섞여 들어온 스크립트·이벤트 속성은 제거
+      Array.prototype.forEach.call(b.querySelectorAll('script,iframe,object,embed'),function(el){ el.remove(); });
+      Array.prototype.forEach.call(b.querySelectorAll('*'),function(el){ Array.prototype.slice.call(el.attributes).forEach(function(a){ if(/^on/i.test(a.name)) el.removeAttribute(a.name); }); });
+    }
+    body=b?b.innerHTML:'';
+  }catch(e){ body=''; }
+  if(!body) return htmlContent;
+  var pb='padding:8px 22px;border:none;border-radius:6px;font-size:13px;cursor:pointer';
+  return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>발주서_'+_ddEsc(poNum||'')+'</title>'
+    +'<style>'+css
+    +'body{padding:0}'
+    +'.noprint{margin:0 0 10px;border-radius:0}'
+    +'#po_page{width:1400px}'
+    +'tr{page-break-inside:avoid}'
+    +'*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'@media print{#po_page{zoom:0.745 !important}}'
+    +'</style></head><body>'
+    +'<div class="noprint"><button onclick="window.print()" style="'+pb+';background:#4A148C;color:#fff;font-weight:700;margin-right:8px">🖨️ 인쇄</button>'
+    +'<button onclick="window.close()" style="'+pb+';background:#666;color:#fff">닫기</button></div>'
+    +'<div id="po_page">'+body+'</div>'
+    +'<script>(function(){var p=document.getElementById("po_page");'
+    +'if(!(window.CSS&&CSS.supports&&CSS.supports("zoom","0.5"))){p.style.width="auto";}'
+    +'else{var fit=function(){var w=document.documentElement.clientWidth||window.innerWidth||1400;p.style.zoom=Math.min(1,w/1400);};fit();window.addEventListener("resize",fit);}'
+    +'window.onload=function(){window.print();};})();<\/script>'
+    +'</body></html>';
+}
+function _openPOPrintWindow(html){
+  var w=null; try{ w=window.open('','_blank','width=1120,height=800'); }catch(e){ w=null; }
+  // 새 창을 못 여는 환경(팝업 차단·일부 앱 내 브라우저)에서는 현재 창이 돌아올 수 있음 → 앱 화면을 덮어쓰지 않도록 여기서 멈춤
+  if(!w||w===window) return false;
+  try{ w.document.write(html); w.document.close(); return true; }catch(e){ return false; }
+}
+// 발주서 출력 실행 — mode: 'img'(미리보기 창에서 저장·공유·인쇄) | 'print'(새 창에서 바로 인쇄)
+//  · 한쪽이 안 되면 멈추지 않고 다른 쪽으로 보여줌 (인쇄 창 차단 → 이미지 / 이미지 라이브러리 없음 → 인쇄 창)
+function _poOutput(htmlContent, poNum, vendor, mode){
+  mode=(mode==='img'||mode==='print')?mode:_poOutMode();
+  var printHtml=_poPrintHtml(htmlContent,poNum);
+  var remember=function(m){ try{ store.setItem('po_out_mode',m); }catch(e){} };
+  var hasLib=(typeof html2canvas!=='undefined');
+  if(mode==='print'||!hasLib){
+    if(_openPOPrintWindow(printHtml)){
+      if(mode==='print') remember('print');
+      else { try{ showInfoToast('이미지 라이브러리를 불러오지 못해 인쇄 창으로 열었습니다 (새로고침하면 이미지 방식도 다시 됩니다)','#E65100'); }catch(e){} }
+      renderAll(); return;
+    }
+    if(!hasLib){
+      alert('발주서를 화면에 띄우지 못했습니다.\n· 이미지 라이브러리(html2canvas)를 불러오지 못했고\n· 인쇄 창도 열 수 없었습니다 (팝업 차단 또는 폰 브라우저)\n\n인터넷 연결을 확인하고 새로고침한 뒤 [재출력]을 눌러주세요.');
+      renderAll(); return;
+    }
+    try{ showInfoToast('인쇄 창을 열지 못해 이미지로 보여드립니다 (팝업 차단 또는 폰 브라우저)','#E65100'); }catch(e){}
+  } else remember('img');
+  _poToImage(htmlContent,poNum,vendor,printHtml);
+}
+// 발주서 → 이미지(JPEG) → 미리보기 창 (예전에는 파일을 바로 내려받았음 · 이미지 만드는 방법은 그대로)
+function _poToImage(htmlContent, poNum, vendor, printHtml){
+  var parsedDoc=new DOMParser().parseFromString(htmlContent,'text/html');
+  var poStyleEl=parsedDoc.querySelector('style');
+  var tempStyleTag=document.createElement('style');
+  tempStyleTag.id='__po_temp_style__';
+  if(poStyleEl) tempStyleTag.textContent=poStyleEl.textContent;
+  document.head.appendChild(tempStyleTag);
+
+  var parsedBody=parsedDoc.querySelector('body');
+  var noprintEl=parsedBody&&parsedBody.querySelector('.noprint');
+  if(noprintEl) noprintEl.remove();
+  var captureDiv=document.createElement('div');
+  captureDiv.id='__po_capture__';
+  captureDiv.style.cssText='position:fixed;top:0;left:0;width:1400px;background:#fff;z-index:60000;overflow:hidden;';
+  if(parsedBody) captureDiv.innerHTML=parsedBody.innerHTML;
+  document.body.appendChild(captureDiv);
+
+  var loadingMsg=document.createElement('div');
+  loadingMsg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:70000;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700;flex-direction:column;gap:12px';
+  loadingMsg.innerHTML='<div>📄 발주서 JPEG 생성 중...</div><div style="font-size:13px;opacity:0.85">잠시만 기다려 주세요</div>';
+  document.body.appendChild(loadingMsg);
+
+  function cleanupPO(){
+    try{ tempStyleTag.remove(); }catch(e){}
+    try{ captureDiv.remove(); }catch(e){}
+    try{ loadingMsg.remove(); }catch(e){}
+  }
+
+  setTimeout(function(){
+    if(typeof html2canvas==='undefined'){
+      cleanupPO();
+      alert('이미지 라이브러리(html2canvas)를 불러오지 못했습니다.\n새로고침한 뒤 [재출력]을 누르거나, 🖨️ 프린터 인쇄 방식을 선택하세요.');
+      renderAll();return;
+    }
+    html2canvas(captureDiv,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,width:1400,windowWidth:1400}).then(function(canvas){
+      cleanupPO();
+      canvas.toBlob(function(blob){
+        if(!blob){ alert('이미지 변환에 실패했습니다.\n[재출력]에서 🖨️ 프린터 인쇄 방식으로 다시 시도해 보세요.'); renderAll(); return; }
+        _showPOImage({blob:blob,url:URL.createObjectURL(blob),name:'발주서_'+_receiptSafeName(poNum)+'.jpg'},poNum,vendor,printHtml);
+        renderAll();
+      },'image/jpeg',0.95);
+    }).catch(function(err){
+      cleanupPO();
+      console.error('발주서 이미지 오류:',err);
+      alert('이미지 변환 실패: '+((err&&err.message)||err)+'\n[재출력]에서 🖨️ 프린터 인쇄 방식으로 다시 시도해 보세요.');
+      renderAll();
+    });
+  },400);
+}
+// 발주서 이미지 미리보기 창 — ⬇ 저장 · 📤 공유(지원 브라우저) · 🖨️ 인쇄 · 이미지를 누르면 확대
+function _showPOImage(r, poNum, vendor, printHtml){
+  var file=null; try{ file=new File([r.blob],r.name,{type:'image/jpeg'}); }catch(e){ file=null; }
+  var canShare=false;
+  try{ canShare=!!(file&&navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})); }catch(e){ canShare=false; }
+  var old=document.getElementById('_po_img_overlay'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='_po_img_overlay'; ov.className='dyn-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:8px';
+  var btn='padding:11px 10px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;flex:1;min-width:110px';
+  ov.innerHTML='<div class="pop-fixed" style="background:#fff;border-radius:12px;width:100%;max-width:1100px;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3);overflow:hidden">'
+    +'<div style="padding:12px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:8px">'
+      +'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700;color:#1A237E">📄 발주서 이미지</div>'
+        +'<div style="font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_ddEsc(poNum||'')+' · '+_ddEsc(vendor||'')+'</div></div>'
+      +'<button id="_po_img_close" style="padding:4px 10px;background:#eee;border:none;border-radius:6px;font-size:14px;cursor:pointer">✕</button>'
+    +'</div>'
+    +'<div data-popup-body style="flex:1;min-height:0;overflow:auto;padding:12px 16px;background:#F3F4F6;-webkit-overflow-scrolling:touch">'
+      +'<img id="_po_img" src="'+r.url+'" alt="'+_ddEsc(r.name)+'" style="width:100%;border:1px solid #ddd;background:#fff;display:block;cursor:zoom-in">'
+      +'<div style="font-size:11px;color:#666;text-align:center;padding:8px 0 2px">이미지를 누르면 크게 볼 수 있습니다 · 폰에서는 길게 눌러 사진으로 저장할 수도 있습니다</div>'
+    +'</div>'
+    +'<div style="padding:10px 14px;border-top:1px solid #eee;display:flex;gap:8px;flex-wrap:wrap">'
+      +(canShare?'<button id="_po_share" style="'+btn+';background:#FEE500;color:#3E2723">📤 공유 (카카오톡 등)</button>':'')
+      +'<button id="_po_dl" style="'+btn+';background:#1A237E;color:#fff">⬇ 저장</button>'
+      +'<button id="_po_print" style="'+btn+';background:#E8EAF6;color:#1A237E;border:1.5px solid #C5CAE9">🖨️ 인쇄</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(ov);
+  var done=false;
+  function close(){ if(done) return; done=true; try{ ov.remove(); }catch(e){} setTimeout(function(){ try{ URL.revokeObjectURL(r.url); }catch(e){} },60000); }
+  document.getElementById('_po_img_close').onclick=close;
+  ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  var img=document.getElementById('_po_img'), zoomed=false;
+  img.onclick=function(){ zoomed=!zoomed; img.style.width=zoomed?'1400px':'100%'; img.style.maxWidth=zoomed?'none':''; img.style.cursor=zoomed?'zoom-out':'zoom-in'; };
+  document.getElementById('_po_dl').onclick=function(){ _dlBlobUrl(r.url,r.name); };
+  document.getElementById('_po_print').onclick=function(){
+    if(!_openPOPrintWindow(printHtml)) alert('인쇄 창을 열지 못했습니다 (팝업 차단 또는 폰 브라우저).\n⬇ 저장한 이미지를 사진 앱에서 인쇄하거나, PC에서 인쇄해 주세요.');
+  };
+  var sh=document.getElementById('_po_share');
+  if(sh) sh.onclick=function(){
+    navigator.share({files:[file],title:'발주서 '+(poNum||'')}).catch(function(e){ if(!e||(e.name!=='AbortError'&&e.name!=='InvalidStateError')) alert('공유 실패: '+((e&&e.message)||e)+'\n⬇ 저장 후 사진으로 보내주세요.'); });
+  };
+}
 function reprintPO(idx){
+  const pos0=loadData('pos');
+  const p0=pos0[idx];
+  if(!p0||p0.status!=='발주완료'){alert('발주완료 항목만 재출력할 수 있습니다.');return;}
+  const cnt0=pos0.filter(function(item){return item.num===p0.num&&item.status==='발주완료';}).length;
+  // 출력 방식(이미지/프린터 인쇄)을 고른 뒤 출력 — 거래명세표와 같은 방식
+  _poAskMode({num:p0.num,vendor:p0.vendor||'-',count:cnt0},function(mode){ _reprintPODo(idx,p0._id,mode); });
+}
+function _reprintPODo(idx,pid,mode){
   const pos=loadData('pos');
-  const p=pos[idx];
+  // 팝업이 떠 있는 동안 목록이 바뀌었을 수 있으므로(다른 기기 동기화) 고유 ID로 다시 찾음 — 없어졌으면 다른 건을 출력하지 않음
+  const p=pid?pos.find(function(x){return x&&x._id===pid;}):pos[idx];
   if(!p||p.status!=='발주완료'){alert('발주완료 항목만 재출력할 수 있습니다.');return;}
 
   // 같은 발주번호 항목 전체 수집
@@ -8585,58 +8796,8 @@ function reprintPO(idx){
     +'<p style="margin-top:10px;font-size:9px;color:#888;text-align:center">두리글로벌 | 경기도 안성시</p>'
     +'</div>';
 
-  // html2canvas로 JPEG 생성 (재출력)
-  const parser3=new DOMParser();
-  const parsedDoc3=parser3.parseFromString(htmlContent,'text/html');
-  const poStyleEl3=parsedDoc3.querySelector('style');
-  const tempStyleTag3=document.createElement('style');
-  tempStyleTag3.id='__po_temp_style3__';
-  if(poStyleEl3) tempStyleTag3.textContent=poStyleEl3.textContent;
-  document.head.appendChild(tempStyleTag3);
-
-  const parsedBody3=parsedDoc3.querySelector('body');
-  const noprintEl3=parsedBody3&&parsedBody3.querySelector('.noprint');
-  if(noprintEl3) noprintEl3.remove();
-  const captureDiv3=document.createElement('div');
-  captureDiv3.id='__po_capture3__';
-  captureDiv3.style.cssText='position:fixed;top:0;left:0;width:1400px;background:#fff;z-index:60000;overflow:hidden;';
-  if(parsedBody3) captureDiv3.innerHTML=parsedBody3.innerHTML;
-  document.body.appendChild(captureDiv3);
-
-  const loadingMsg3=document.createElement('div');
-  loadingMsg3.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:70000;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700;flex-direction:column;gap:12px';
-  loadingMsg3.innerHTML='<div>📄 발주서 JPEG 생성 중...</div><div style="font-size:13px;opacity:0.85">잠시만 기다려 주세요</div>';
-  document.body.appendChild(loadingMsg3);
-
-  function cleanupPO3(){
-    var s=document.getElementById('__po_temp_style3__');if(s)s.remove();
-    var c=document.getElementById('__po_capture3__');if(c)c.remove();
-    if(document.body.contains(loadingMsg3))document.body.removeChild(loadingMsg3);
-  }
-
-  setTimeout(function(){
-    if(typeof html2canvas==='undefined'){
-      cleanupPO3();
-      alert('라이브러리 로딩 실패. 페이지를 새로고침 후 다시 시도해주세요.');
-      renderAll();return;
-    }
-    html2canvas(captureDiv3,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,width:1400,windowWidth:1400}).then(function(canvas){
-      cleanupPO3();
-      canvas.toBlob(function(blob){
-        var url=URL.createObjectURL(blob);
-        var a=document.createElement('a');
-        a.href=url;a.download='발주서_'+p.num+'.jpg';
-        document.body.appendChild(a);a.click();document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        renderAll();
-      },'image/jpeg',0.95);
-    }).catch(function(err){
-      cleanupPO3();
-      console.error('JPEG 오류(재출력):',err);
-      alert('JPEG 변환 실패: '+err.message);
-      renderAll();
-    });
-  },400);
+  // 출력: 고른 방식대로 (이미지 → 미리보기 창에서 저장·공유·인쇄 / 프린터 인쇄 → 새 창)
+  _poOutput(htmlContent,p.num,vendor,mode);
 }
 
 // ════ 발주 상태 초기화 ════
@@ -8746,6 +8907,10 @@ function printPO(){
         <tbody>${rows}</tbody>
       </table>
       </div>
+      <div style="flex-shrink:0;margin:2px 0 12px">
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px">출력 방식</div>
+        ${_poModeCardsHtml(_poOutMode())}
+      </div>
       <div class="pop-foot" style="display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;margin-top:4px">
         <button id="po_split_cancel" style="padding:9px 20px;background:#888;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">취소</button>
         <button id="po_split_ok" style="padding:9px 20px;background:#1A237E;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">✅ 발주서 출력</button>
@@ -8753,6 +8918,7 @@ function printPO(){
     </div>`;
 
   document.body.appendChild(overlay);
+  const getPoMode=_poBindModeCards(overlay);
   document.getElementById('po_split_cancel').onclick=function(){ document.body.removeChild(overlay); };
 
   document.getElementById('po_split_ok').onclick=function(){
@@ -8767,6 +8933,7 @@ function printPO(){
       if(splitQtys[i]>(+selected[i].qty||0)){alert('발주수량이 전체수량을 초과합니다: '+selected[i].product);return;}
     }
 
+    const outMode=getPoMode();
     document.body.removeChild(overlay);
 
     const vendor=vendors[0];
@@ -8986,58 +9153,8 @@ function printPO(){
       +'<p style="margin-top:10px;font-size:9px;color:#888;text-align:center">두리글로벌 | 경기도 안성시</p>'
       +'</div>';
 
-    // 현재 페이지에서 직접 html2canvas 캡처 (팝업 없음)
-    const parser2=new DOMParser();
-    const parsedDoc=parser2.parseFromString(htmlContent,'text/html');
-    const poStyleEl=parsedDoc.querySelector('style');
-    const tempStyleTag=document.createElement('style');
-    tempStyleTag.id='__po_temp_style__';
-    if(poStyleEl) tempStyleTag.textContent=poStyleEl.textContent;
-    document.head.appendChild(tempStyleTag);
-
-    const parsedBody=parsedDoc.querySelector('body');
-    const noprintEl2=parsedBody&&parsedBody.querySelector('.noprint');
-    if(noprintEl2) noprintEl2.remove();
-    const captureDiv=document.createElement('div');
-    captureDiv.id='__po_capture__';
-    captureDiv.style.cssText='position:fixed;top:0;left:0;width:1400px;background:#fff;z-index:60000;overflow:hidden;';
-    if(parsedBody) captureDiv.innerHTML=parsedBody.innerHTML;
-    document.body.appendChild(captureDiv);
-
-    const loadingMsg=document.createElement('div');
-    loadingMsg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:70000;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700;flex-direction:column;gap:12px';
-    loadingMsg.innerHTML='<div>📄 발주서 JPEG 생성 중...</div><div style="font-size:13px;opacity:0.85">잠시만 기다려 주세요</div>';
-    document.body.appendChild(loadingMsg);
-
-    function cleanupPO(){
-      var s=document.getElementById('__po_temp_style__');if(s)s.remove();
-      var c=document.getElementById('__po_capture__');if(c)c.remove();
-      if(document.body.contains(loadingMsg))document.body.removeChild(loadingMsg);
-    }
-
-    setTimeout(function(){
-      if(typeof html2canvas==='undefined'){
-        cleanupPO();
-        alert('라이브러리 로딩 실패. 페이지를 새로고침 후 다시 시도해주세요.');
-        renderAll();return;
-      }
-      html2canvas(captureDiv,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,width:1400,windowWidth:1400}).then(function(canvas){
-        cleanupPO();
-        canvas.toBlob(function(blob){
-          var url=URL.createObjectURL(blob);
-          var a=document.createElement('a');
-          a.href=url;a.download='발주서_'+newPONum+'.jpg';
-          document.body.appendChild(a);a.click();document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          renderAll();
-        },'image/jpeg',0.95);
-      }).catch(function(err){
-        cleanupPO();
-        console.error('JPEG 오류:',err);
-        alert('JPEG 변환 실패: '+err.message);
-        renderAll();
-      });
-    },400);
+    // 출력: 고른 방식대로 (이미지 → 미리보기 창에서 저장·공유·인쇄 / 프린터 인쇄 → 새 창)
+    _poOutput(htmlContent,newPONum,vendor,outMode);
   };
 }
 // ════ 입고 처리 ════
