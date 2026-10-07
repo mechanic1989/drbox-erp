@@ -1079,7 +1079,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.13</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.14</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -4685,6 +4685,12 @@ store.onReady(function(){ try{ migrateRecordIds(); }catch(e){ console.warn('migr
 function fmtLocalDate(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
 function parseYmd(str){ if(!str) return new Date(NaN); var a=String(str).slice(0,10).split('-'); return new Date(+a[0],+a[1]-1,+a[2]||1); }
 function today(){return fmtLocalDate(new Date());}
+// 오늘부터 그 날짜까지 남은 날수 (오늘 0 · 내일 1 · 어제 -1) — 시각이 아니라 날짜끼리 비교.
+//  new Date('2026-10-08') 은 한국 시간으로 그날 오전 9시라서, 지금 시각과 빼서 올림하면 오전 9시 전에는 하루씩 많게 나옴
+function _daysUntil(ymd,todayStr){
+  var m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(ymd||'')), d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(ymd), t=parseYmd(todayStr||today());
+  return Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-new Date(t.getFullYear(),t.getMonth(),t.getDate()))/86400000);
+}
 
 // ══════════════════════════════════════
 // 앱 설정 (기본 결제조건 등) — settings 객체, 동기화·백업 포함
@@ -5835,7 +5841,7 @@ function renderOrders(){
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-size:11px">'+((o.paper||'').toUpperCase()||'-')+'</td>'
       +'<td style="padding:6px;text-align:right;border-bottom:1px solid #EEE;font-weight:600;font-size:11px">'+(+o.qty||0).toLocaleString()+'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-size:11px;font-weight:600;color:#BF360C">'+(o.due||'-')+'</td>'
-      +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE">'+(due!==null?ddayBadge(due,o.status):'-')+'</td>'
+      +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE">'+(due!==null?ddayBadge(due,_orderShipDone(o)?'완료':o.status):'-')+'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-size:11px">'+(o.dest||'-')+'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;white-space:nowrap">'+manageBtns+'</td></tr>';
   });
@@ -6125,6 +6131,10 @@ function getDeliveryStatus(o){
   if(outQty>=qty) return '출고완료';
   return '부분출고';
 }
+// 수주가 전량 출고됐는지 — 출고수량으로만 판단 (납기관리와 같은 기준).
+//  수주의 status 값은 출고처리로 바뀌지 않아 늘 '접수'라서, status 만 보던 홈의 납품 일정 달력·최근 수주에는 이미 나간 건이 계속 남아 있었음.
+//  거꾸로 데이터 검진의 [보정]이 넣은 '출고완료'는 그 뒤 출고취소를 해도 남으므로, status 를 믿으면 아직 안 나간 수주가 가려짐 → status 는 보지 않음
+function _orderShipDone(o){ return !!o&&getDeliveryStatus(o)==='출고완료'; }
 var delSortCol='due', delSortAsc=true;
 function setDelSort(col){
   if(delSortCol===col) delSortAsc=!delSortAsc;
@@ -16118,7 +16128,7 @@ function buildDailyBriefing(){
   var in3=fmtLocalDate(new Date(now.getTime()+3*86400000));
   var in7=fmtLocalDate(new Date(now.getTime()+7*86400000));
   var orders=loadData('orders'), deliveries=loadData('deliveries'), master=loadData('master'), pos=loadData('pos'), stocks=loadData('stocks');
-  var open=orders.filter(function(o){ return o.due&&o.status!=='출고완료'&&(+(o.outQty||0))<(+(o.qty||0)); });
+  var open=orders.filter(function(o){ return o.due&&(+(o.outQty||0))<(+(o.qty||0)); }); // 출고수량으로만 판단 (status 는 믿지 않음 — _orderShipDone 설명 참고)
   var remainOf=function(o){ return (+(o.qty||0))-(+(o.outQty||0)); };
   var dueToday=open.filter(function(o){ return o.due===td; });
   var dueSoon=open.filter(function(o){ return o.due>td&&o.due<=in3; }).sort(function(a,b){ return a.due<b.due?-1:1; });
@@ -16406,7 +16416,7 @@ function renderDashboard(){
 
   // 납기 임박 (3일 이내, 미출고)
   var urgentDeliveries=orders.filter(function(o){
-    return o.due&&o.due>=today&&o.due<=in3days&&(+(o.outQty||0))<(+(o.qty||0))&&o.status!=='출고완료';
+    return o.due&&o.due>=today&&o.due<=in3days&&(+(o.outQty||0))<(+(o.qty||0)); // 출고수량으로만 판단 (status 는 믿지 않음 — _orderShipDone 설명 참고)
   });
 
   // 미입고 발주
@@ -16466,9 +16476,10 @@ function renderDashboard(){
     urgHtml+='<div class="dash-row" style="color:#888;justify-content:center">임박 건 없음 ✅</div>';
   } else {
     urgentDeliveries.slice(0,8).forEach(function(o){
-      var dday=Math.ceil((new Date(o.due)-now)/(1000*86400));
+      var dday=_daysUntil(o.due,today);
+      var uQty=+(o.qty||0), uOut=+(o.outQty||0);
       var badge=dday<=0?'<span class="dash-badge red">D-Day</span>':('<span class="dash-badge orange">D-'+dday+'</span>');
-      urgHtml+='<div class="dash-row"><div><div style="font-weight:600;color:#1F4E79">'+o.client+' · '+o.product+'</div><div style="font-size:10px;color:#888">'+o.due+' | '+Number(o.qty||0).toLocaleString()+'매</div></div>'+badge+'</div>';
+      urgHtml+='<div class="dash-row"><div><div style="font-weight:600;color:#1F4E79">'+o.client+' · '+o.product+'</div><div style="font-size:10px;color:#888">'+o.due+' | '+(uOut>0?'남은 '+Math.max(0,uQty-uOut).toLocaleString()+'매 (수주 '+uQty.toLocaleString()+'매)':uQty.toLocaleString()+'매')+'</div></div>'+badge+'</div>';
     });
   }
   urgHtml+='</div>';
@@ -16499,7 +16510,7 @@ function renderDashboard(){
     poHtml+='<div class="dash-row" style="color:#888;justify-content:center">미입고 발주 없음 ✅</div>';
   } else {
     pendingPOs.slice(0,8).forEach(function(p){
-      var dday=p.due?Math.ceil((new Date(p.due)-now)/(1000*86400)):null;
+      var dday=p.due?_daysUntil(p.due,today):null;
       var badge=dday===null?'':dday<0?'<span class="dash-badge red">납기초과</span>':('<span class="dash-badge blue">D-'+dday+'</span>');
       poHtml+='<div class="dash-row"><div><div style="font-weight:600">'+p.vendor+' · '+p.product+'</div><div style="font-size:10px;color:#888">'+p.num+' | '+(p.due||'-')+'</div></div>'+badge+'</div>';
     });
@@ -16596,7 +16607,7 @@ function renderDashboard(){
     roHtml+='<div class="dash-row" style="color:#888;justify-content:center">수주 없음</div>';
   } else {
     recentOrders.forEach(function(o){
-      var statusBadge=o.status==='출고완료'?'<span class="dash-badge green">출고완료</span>':o.outQty>0?'<span class="dash-badge blue">출고중</span>':'<span class="dash-badge orange">대기</span>';
+      var statusBadge=_orderShipDone(o)?'<span class="dash-badge green">출고완료</span>':o.outQty>0?'<span class="dash-badge blue">출고중</span>':'<span class="dash-badge orange">대기</span>';
       roHtml+='<div class="dash-row"><div><div style="font-weight:600;color:#1F4E79">'+o.client+' · '+o.product+'</div><div style="font-size:10px;color:#888">'+o.date+' | '+Number(o.qty||0).toLocaleString()+'매</div></div>'+statusBadge+'</div>';
     });
   }
@@ -16624,7 +16635,7 @@ function renderDeliveryCalendar(orders, todayStr, defaultYm){
   orders.forEach(function(o){
     if(!o.due||!o.client) return;
     if(o.due.slice(0,7)!==ym) return;
-    if(o.status==='출고완료') return; // 완료건은 표시 안 함
+    if(_orderShipDone(o)) return; // 전량 출고된 건은 표시 안 함 — 출고수량으로 판단 (납기일보다 먼저 나간 건 포함)
     if(!dueMap[o.due]) dueMap[o.due]=[];
     if(dueMap[o.due].indexOf(o.client)===-1) dueMap[o.due].push(o.client);
     dueCnt[o.due]=(dueCnt[o.due]||0)+1;
@@ -16695,12 +16706,17 @@ function renderDeliveryCalendar(orders, todayStr, defaultYm){
 // 캘린더 날짜/거래처 클릭 → 그날 납품 품목·수량 상세 (hlClient: 누른 거래처를 맨 위에 강조)
 function openCalDay(dateStr, hlClient){
   if(!dateStr) return;
-  var orders=loadData('orders').filter(function(o){ return o&&o.due===dateStr&&o.client&&o.status!=='출고완료'; });
+  // 그날 납기인 수주 가운데 아직 나갈 것이 남은 건만 — 전량 출고된 건(납기일보다 먼저 나간 건 포함)은 빼고 몇 건을 뺐는지만 알려줌.
+  //  일부만 나간 건은 남은 수량으로 보여줌. (예전에는 수주의 status 만 보았는데 그 값은 출고해도 바뀌지 않아 아무것도 빠지지 않았음)
+  var dueAll=loadData('orders').filter(function(o){ return o&&o.due===dateStr&&o.client; });
+  var orders=dueAll.filter(function(o){ return !_orderShipDone(o); });
+  var doneCnt=dueAll.length-orders.length;
+  var remOf=function(o){ return Math.max(0,(+o.qty||0)-Math.max(0,+o.outQty||0)); }; // 남은 수량 (출고수량이 잘못 음수로 저장된 건은 0 으로 봄)
   if(!orders.length) return;
   var clients=loadData('clients'), aliasOf={};
   clients.forEach(function(c){ if(c&&c.name) aliasOf[c.name]=c.alias||''; });
   var groups=[];
-  orders.forEach(function(o){ var g=groups.find(function(x){ return x.client===o.client; }); if(!g){ g={client:o.client,items:[],qty:0,remain:0}; groups.push(g); } g.items.push(o); g.qty+=(+o.qty||0); g.remain+=Math.max(0,(+o.qty||0)-(+o.outQty||0)); });
+  orders.forEach(function(o){ var g=groups.find(function(x){ return x.client===o.client; }); if(!g){ g={client:o.client,items:[],qty:0,remain:0}; groups.push(g); } g.items.push(o); g.qty+=(+o.qty||0); g.remain+=remOf(o); });
   if(hlClient){ groups.sort(function(a,b){ return (a.client===hlClient?0:1)-(b.client===hlClient?0:1); }); }
   var d=new Date(dateStr+'T00:00:00'); var dow=['일','월','화','수','목','금','토'][d.getDay()];
   var tStr=today(); var diff=Math.round((new Date(dateStr+'T00:00:00')-new Date(tStr+'T00:00:00'))/86400000);
@@ -16709,19 +16725,21 @@ function openCalDay(dateStr, hlClient){
   var old=document.getElementById('cal_day_overlay'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='cal_day_overlay'; ov.className='dyn-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:10px';
-  var total=orders.length, totalQty=orders.reduce(function(a,o){ return a+(+o.qty||0); },0);
+  var total=orders.length, totalQty=orders.reduce(function(a,o){ return a+remOf(o); },0);
+  var anyPart=orders.some(function(o){ return (+o.outQty||0)>0; });
   var body=groups.map(function(g){
     var hl=(hlClient&&g.client===hlClient);
     var rows=g.items.map(function(o){
-      var qty=+o.qty||0, out=+o.outQty||0, remain=Math.max(0,qty-out);
+      var qty=+o.qty||0, out=Math.max(0,+o.outQty||0), remain=remOf(o);
+      var st=out>0?'부분출고':(o.status==='출고완료'?'미출고':(o.status||'')); // 출고수량이 0 인데 status 만 '출고완료'로 남은 건(검진 보정 뒤 출고취소)은 '미출고'로
       return '<div data-cal-row style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #F0F0F0">'
         +'<div style="flex:1;min-width:0">'
           +'<div style="font-size:13px;font-weight:700;color:#222;line-height:1.3;word-break:keep-all;overflow-wrap:anywhere">'+_ddEsc(o.product||'-')+'</div>'
-          +'<div style="font-size:10px;color:#777;margin-top:2px">'+_ddEsc(o.num||'')+(o.dest?' · 납품처 '+_ddEsc(o.dest):'')+(o.status?' · <span style="background:'+(stBg[o.status]||'#ECEFF1')+';padding:0 5px;border-radius:3px">'+_ddEsc(o.status)+'</span>':'')+'</div>'
+          +'<div style="font-size:10px;color:#777;margin-top:2px">'+_ddEsc(o.num||'')+(o.dest?' · 납품처 '+_ddEsc(o.dest):'')+(st?' · <span style="background:'+(stBg[st]||'#ECEFF1')+';padding:0 5px;border-radius:3px">'+_ddEsc(st)+'</span>':'')+'</div>'
         +'</div>'
         +'<div style="text-align:right;white-space:nowrap">'
-          +'<div style="font-size:14px;font-weight:800;color:#1F4E79">'+qty.toLocaleString()+'<span style="font-size:10px;font-weight:400;color:#777"> 매</span></div>'
-          +(out>0?'<div style="font-size:10px;color:#E65100">출고 '+out.toLocaleString()+' · 남은 '+remain.toLocaleString()+'</div>':'')
+          +'<div style="font-size:14px;font-weight:800;color:#1F4E79">'+remain.toLocaleString()+'<span style="font-size:10px;font-weight:400;color:#777"> 매</span></div>'
+          +(out>0?'<div style="font-size:10px;color:#E65100">수주 '+qty.toLocaleString()+' · 이미 출고 '+out.toLocaleString()+'</div>':'')
         +'</div>'
       +'</div>';
     }).join('');
@@ -16729,7 +16747,7 @@ function openCalDay(dateStr, hlClient){
       +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
         +'<span style="font-size:13px;font-weight:800;color:#1F4E79">🏢 '+_ddEsc(aliasOf[g.client]||g.client)+'</span>'
         +(aliasOf[g.client]?'<span style="font-size:10px;color:#888">'+_ddEsc(g.client)+'</span>':'')
-        +'<span style="margin-left:auto;font-size:11px;color:#555">'+g.items.length+'품목 · <b>'+g.qty.toLocaleString()+'매</b></span>'
+        +'<span style="margin-left:auto;font-size:11px;color:#555">'+g.items.length+'품목 · <b>'+g.remain.toLocaleString()+'매</b></span>'
       +'</div>'
       +rows
     +'</div>';
@@ -16739,7 +16757,7 @@ function openCalDay(dateStr, hlClient){
       +'<div style="flex:1;font-size:15px;font-weight:700;color:#1F4E79">📅 '+dateStr.slice(5).replace('-','/')+' ('+dow+') 납품 일정'+dBadge+'</div>'
       +'<button onclick="document.getElementById(\'cal_day_overlay\').remove()" style="padding:4px 10px;background:#eee;border:none;border-radius:6px;font-size:14px;cursor:pointer">✕</button>'
     +'</div>'
-    +'<div style="font-size:11px;color:#666;margin-bottom:8px;flex-shrink:0">거래처 '+groups.length+'곳 · '+total+'건 · 총 '+totalQty.toLocaleString()+'매'+(hlClient?' — 누른 거래처를 맨 위에 표시':'')+'</div>'
+    +'<div style="font-size:11px;color:#666;margin-bottom:8px;flex-shrink:0">거래처 '+groups.length+'곳 · '+total+'건 · 총 '+totalQty.toLocaleString()+'매'+(anyPart?' (남은 수량)':'')+(doneCnt?' · 출고 완료 '+doneCnt+'건 제외':'')+(hlClient?' — 누른 거래처를 맨 위에 표시':'')+'</div>'
     +'<div data-popup-body style="overflow-y:auto;flex:1 1 auto;min-height:0">'+body+'</div>'
     +'<div class="pop-foot" style="display:flex;gap:8px;margin-top:10px;flex-shrink:0">'
       +'<button onclick="document.getElementById(\'cal_day_overlay\').remove();switchTab(\'tab_delivery\')" style="flex:1;padding:10px;background:#1F4E79;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">📋 납기관리로 이동</button>'
