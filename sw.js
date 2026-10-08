@@ -1,5 +1,5 @@
 // 박스 ERP 서비스워커 — 앱 셸 오프라인 캐시 (데이터는 Firebase/localStorage가 담당)
-const VERSION='box-erp-v22';
+const VERSION='box-erp-v23';
 const CDN_HOSTS=['cdnjs.cloudflare.com','www.gstatic.com'];
 self.addEventListener('install',e=>{ self.skipWaiting(); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
