@@ -1079,7 +1079,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.14</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.4.15</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -8329,14 +8329,21 @@ function saveOrder(){
     saveData('stocks',stocks);
   } else {
     const oldNum=orders[idx].num;
+    const prevOrd={qty:+orders[idx].qty||0,due:orders[idx].due||'',vendor:orders[idx].vendor||'',product:orders[idx].product||''}; // 수정 전 값 (아래 발주 줄 반영에서 '바꾼 것만' 가리는 데 씀)
     orders[idx]=Object.assign(orders[idx],data);
     // 연동 발주 업데이트
     const pos=loadData('pos');
     pos.forEach(function(p,i){
       if(p.fromOrder===oldNum){
-        pos[i]=Object.assign(pos[i],{product:data.product,flute:data.flute,paper:data.paper,
-          qty:data.qty,due:data.due,vendor:data.vendor||p.vendor||'',
-          buy_price:data.buy_price||p.buy_price||0,fromOrder:data.num}); // 발주 비고(note)는 사용자가 입력한 그대로 유지
+        // 품명·골·원지·매입단가·납품처는 늘 수주를 따라감. 수량·납기일·발주처는 수주에서 이번에 그 값을 바꿨을 때만
+        //  — 발주관리 [수정]에서 따로 고친 값이, 수주의 다른 칸(예: 납품처)만 고쳤는데 되돌아가지 않게. (품명을 바꾸면 발주처도 따라감)
+        //  (값이 원래 수주와 같던 줄은 예전과 결과가 같음)
+        const upd={product:data.product,flute:data.flute,paper:data.paper,
+          buy_price:data.buy_price||p.buy_price||0,dest:data.dest||'',fromOrder:data.num}; // 발주 비고(note)는 사용자가 입력한 그대로 유지
+        if((+data.qty||0)!==prevOrd.qty) upd.qty=data.qty;
+        if((data.due||'')!==prevOrd.due) upd.due=data.due;
+        if((data.vendor||'')!==prevOrd.vendor||(data.product||'')!==prevOrd.product) upd.vendor=data.vendor||p.vendor||'';
+        pos[i]=Object.assign(pos[i],upd);
       }
     });
     saveData('pos',pos);
@@ -8374,7 +8381,11 @@ function openOrderDueDestModal(orderId, poId){
   var issued=linked.filter(function(x){ return x.status==='발주완료'; }).length;
   var closed=linked.filter(function(x){ return isMonthClosed(x.issuedDate||x.date); }).length;
   var pending=num?stocks.filter(function(st){ return st&&st.fromOrder===num&&st.status!=='입고완료'; }).length:0;
-  var curDue=(o?o.due:p.due)||'', curDest=(o?o.dest:p.dest)||'';
+  // 발주 줄에서 열었으면 그 줄의 납기일을 보여줌 (발주관리 [수정]으로 수주와 다르게 정했을 수 있음 · 비어 있으면 수주의 납기일을 채워 둠). 납품처는 수주의 것
+  var curDue=((poId&&p&&p.due)?p.due:(o?o.due:p.due))||'', curDest=(o?o.dest:p.dest)||'';
+  // 발주 줄에서 열었는데 그 줄의 납기일이 비어 있으면: 위에 채워 둔 수주의 날짜를 그대로 저장할 때 '그 줄에만' 넣음 (날짜를 바꾸면 예전처럼 모두 함께)
+  var fillBlank=!!(poId&&p&&!p.due&&curDue);
+  var dueDiffN=o?linked.filter(function(x){ return (x.due||'')!==(o.due||'')&&!isMonthClosed(x.issuedDate||x.date); }).length:0;
   var client=o?(o.client||''):(p.client||'');
   // 납품처 후보: 거래처등록의 납품처 + 같은 거래처 수주에 쓰인 납품처
   var cands=[];
@@ -8390,12 +8401,14 @@ function openOrderDueDestModal(orderId, poId){
   var title=o?('수주 '+_ddEsc(o.num)+' · '+_ddEsc(o.client)+' · '+_ddEsc(o.product)+' · '+(+o.qty||0).toLocaleString()+'매'):('발주 '+_ddEsc(p.num||'(미발주)')+' · '+_ddEsc(p.product));
   var hint='함께 바뀌는 항목: '+(o?'수주 1건 · ':'')+'발주 '+linked.length+'건'+(issued?' (발주완료 '+issued+'건)':'')+(pending?' · 입고예정 '+pending+'건':'')
     +(closed?' <span style="color:#C62828">· 마감된 달의 발주 '+closed+'건은 변경되지 않습니다</span>':'')
+    +((o&&p&&poId&&(p.due||'')!==(o.due||''))?(p.due?'<br>이 발주 줄의 납기일('+_ddEsc(p.due)+')은 수주의 납기일('+_ddEsc(o.due||'없음')+')과 다릅니다 — 날짜를 바꿔 저장하면 수주·다른 발주 줄·입고예정도 그 날짜로 바뀝니다.':'<br>이 발주 줄에는 납기일이 비어 있습니다 — 저장하면 위 날짜(수주의 납기일)가 이 줄에 들어갑니다.'):'')
+    +((o&&!poId&&dueDiffN)?'<br>납기일이 수주와 다른 발주 줄 '+dueDiffN+'건은, 여기서 날짜를 바꿔 저장할 때만 함께 바뀝니다 (그 줄만 맞추려면 발주관리에서 그 줄을 고치세요).':'')
     +(issued?'<br>발주서를 이미 거래처에 보냈다면, 변경 후 <b>재출력</b>해서 다시 전달하세요.':'');
   ov.innerHTML='<div style="background:#fff;border-radius:12px;padding:18px 20px;min-width:440px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.3)">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:14px;font-weight:700;color:#1F4E79">📅 납기일·납품처 변경</div><button onclick="document.getElementById(\'duedest_overlay\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888">✕</button></div>'
     +'<div style="font-size:11px;color:#555;margin-bottom:12px;background:#F5F7FA;border-radius:6px;padding:7px 10px">'+title+'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
-      +'<div><label style="font-size:10px;color:#666;display:block;margin-bottom:3px">납기일</label><input type="date" id="dd_due" value="'+_ddEsc(curDue)+'" style="width:100%;padding:8px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px"></div>'
+      +'<div><label style="font-size:10px;color:#666;display:block;margin-bottom:3px">납기일</label><input type="date" id="dd_due" value="'+_ddEsc(curDue)+'" data-init="'+_ddEsc(curDue)+'" data-fill="'+(fillBlank?'1':'')+'" style="width:100%;padding:8px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px"></div>'
       +'<div><label style="font-size:10px;color:#666;display:block;margin-bottom:3px">납품처</label><input type="text" id="dd_dest" list="dd_dest_list" value="'+_ddEsc(curDest)+'" placeholder="납품처" style="width:100%;padding:8px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px"><datalist id="dd_dest_list">'+cands.map(function(c){ return '<option value="'+_ddEsc(c)+'">'; }).join('')+'</datalist></div>'
     +'</div>'
     +'<div style="font-size:10px;color:#666;line-height:1.6;margin-top:10px;padding:8px 10px;background:#FFFDF5;border:1px solid #FFE082;border-radius:6px">'+hint+'</div>'
@@ -8417,18 +8430,31 @@ function saveOrderDueDest(orderId, poId){
   if(!o&&!p){ alert('대상을 찾을 수 없습니다.'); return false; }
   var num=o?o.num:(p.fromOrder||'');
   var changedPo=0, changedSt=0, skipped=0, changedOrder=false;
-  if(o&&((o.due||'')!==due||(o.dest||'')!==dest)){ o.due=due; o.dest=dest; changedOrder=true; if(!saveData('orders',orders)) return false; }
+  // 납기일은 '이 창에서 날짜를 바꿨을 때만' 수주·발주 줄에 반영 (창을 열 때 보인 날짜와 비교).
+  //  — 발주관리 [수정]에서 따로 정한 발주 납기일이, 납품처만 바꿨는데 수주의 납기일로 되돌아가지 않게. (발주 줄의 납기일이 수주와 같던 건은 예전과 결과가 같음)
+  var _dueEl=document.getElementById('dd_due'), _initDue=_dueEl?_dueEl.getAttribute('data-init'):null;
+  var dueChanged=(_initDue===null)?true:(due!==_initDue);
+  // 발주 줄에서 열었고 그 줄의 납기일이 비어 있던 경우: 채워져 있던 날짜를 그대로 저장하면 그 줄에만 넣음 (같은 수주의 다른 줄은 건드리지 않음)
+  var fillOnly=!dueChanged&&!!(_dueEl&&_dueEl.getAttribute('data-fill')==='1'&&p&&!p.due);
+  if(o&&((dueChanged&&(o.due||'')!==due)||(o.dest||'')!==dest)){ if(dueChanged) o.due=due; o.dest=dest; changedOrder=true; if(!saveData('orders',orders)) return false; }
+  var changedLines=[];
   var touch=function(x){
     if(isMonthClosed(x.issuedDate||x.date)){ skipped++; return; }
-    if((x.due||'')!==due||(x.dest||'')!==dest){ x.due=due; x.dest=dest; changedPo++; }
+    var ch=false;
+    if((dueChanged||(fillOnly&&x===p))&&(x.due||'')!==due){ x.due=due; ch=true; }
+    if((x.dest||'')!==dest){ x.dest=dest; ch=true; }
+    if(ch){ changedPo++; changedLines.push(x); }
   };
   if(num) pos.forEach(function(x){ if(x&&x.fromOrder===num) touch(x); });
   else if(p) touch(p);
   if(changedPo&&!saveData('pos',pos)) return false;
-  if(num){ stocks.forEach(function(st){ if(st&&st.fromOrder===num&&st.status!=='입고완료'&&(st.date||'')!==due){ st.date=due; changedSt++; } }); if(changedSt) saveData('stocks',stocks); }
+  // 입고예정일은 수주의 납기일을 따라감 (예전과 같음. 수주 없이 발주 줄만 고칠 때는 창의 날짜 · 수주에 납기일이 없으면 건드리지 않음)
+  var stDue=o?(o.due||''):due;
+  if(num&&stDue){ stocks.forEach(function(st){ if(st&&st.fromOrder===num&&st.status!=='입고완료'&&(st.date||'')!==stDue){ st.date=stDue; changedSt++; } }); if(changedSt) saveData('stocks',stocks); }
   var ov=document.getElementById('duedest_overlay'); if(ov) ov.remove();
   try{ ['orders','pos','stocks'].forEach(function(k){ _fbRenderAfterSync(k); }); }catch(e){}
-  var issuedIdx=pos.findIndex(function(x){ return x&&(num?x.fromOrder===num:x===p)&&x.status==='발주완료'; });
+  var issuedIdx=pos.findIndex(function(x){ return x&&changedLines.indexOf(x)!==-1&&x.status==='발주완료'; });
+  if(issuedIdx<0) issuedIdx=pos.findIndex(function(x){ return x&&(num?x.fromOrder===num:x===p)&&x.status==='발주완료'; });
   var msg=(changedOrder||changedPo||changedSt)
     ?'✅ 납기일·납품처 변경 완료 — '+(changedOrder?'수주 · ':'')+'발주 '+changedPo+'건 · 입고예정 '+changedSt+'건 반영'+(skipped?' · 마감 발주 '+skipped+'건 제외':'')
     :'변경된 내용이 없습니다.';
@@ -8489,7 +8515,22 @@ function bulkCancelPOs(){
   const skipped=idxs.length-targets.length;
   if(!targets.length){alert('취소 가능한 항목(발주완료 상태)이 없습니다.\n미발주 항목은 발주관리에서 수정하세요.');return;}
   const lines=targets.map(function(i){return '- '+pos[i].product+' ('+((+pos[i].qty||0)).toLocaleString()+'매)';}).join('\n');
-  if(!confirm(targets.length+'건 발주를 취소합니다.\n미발주로 되돌아갑니다.\n\n'+lines+(skipped?'\n\n※ 미발주 '+skipped+'건은 제외됨':'')+ '\n\n계속하시겠습니까?')) return;
+  // 취소한 수량은 같은 수주의 미발주 줄 하나로 합쳐짐(아래) — 합쳐지는 줄들의 납기일·발주처가 서로 다르면 미리 알림 (한 건씩 취소할 때와 같음).
+  //  남아 있던 미발주 줄뿐 아니라, 함께 취소하는 같은 수주의 다른 발주 건끼리도 합쳐지므로 그것까지 봄
+  const mergeDiff=[], mergeKeep=[];
+  (function(){
+    const groups={}, sig=function(p){ return (p.due||'')+'‖'+(p.vendor||''); };
+    targets.forEach(function(i){ const it=pos[i]; const k=String(it.fromOrder)+'‖'+String(it.product); (groups[k]=groups[k]||[]).push(i); });
+    Object.keys(groups).forEach(function(k){
+      const ids=groups[k], it0=pos[ids[0]], sigs={};
+      const m=pos.find(function(p,j){ return p&&targets.indexOf(j)===-1&&p.fromOrder===it0.fromOrder&&p.product===it0.product&&p.status==='미발주'; });
+      if(m) sigs[sig(m)]=1;
+      ids.forEach(function(i){ sigs[sig(pos[i])]=1; });
+      if(Object.keys(sigs).length>1){ ids.forEach(function(i){ mergeDiff.push(i); }); if(m) mergeKeep.push(m); }
+    });
+  })();
+  const mergeNote=mergeDiff.length?'\n\n※ 아래 건은 미발주 줄 하나로 합쳐지는데, 납기일·발주처가 서로 다릅니다.\n   합친 줄에는 한 가지 납기일·발주처만 남으니, 다시 발주하기 전에 발주관리에서 확인하세요.\n'+mergeDiff.map(function(i){return '   · '+pos[i].product+' ('+((+pos[i].qty||0)).toLocaleString()+'매 · 납기 '+(pos[i].due||'-')+' · '+(pos[i].vendor||'-')+')';}).concat(mergeKeep.map(function(m){return '   · [남아 있는 미발주 줄] '+m.product+' ('+((+m.qty||0)).toLocaleString()+'매 · 납기 '+(m.due||'-')+' · '+(m.vendor||'-')+')';})).join('\n'):'';
+  if(!confirm(targets.length+'건 발주를 취소합니다.\n미발주로 되돌아갑니다.\n\n'+lines+(skipped?'\n\n※ 미발주 '+skipped+'건은 제외됨':'')+mergeNote+ '\n\n계속하시겠습니까?')) return;
   // 높은 인덱스부터 처리 (splice 순서 보장)
   targets.forEach(function(idx){
     const item=pos[idx];
@@ -8716,7 +8757,9 @@ function savePO(){
   if(!data.vendor||!data.paper){alert('발주처와 원지종류는 필수입니다');return;}
   const pos=loadData('pos');
   if(idx===-1) pos.push(data);
-  else pos[idx]=Object.assign({_id:pos[idx]._id,_seq:pos[idx]._seq},data);
+  // 수정: 창에 없는 값(수주 연결 fromOrder · 분할 발주 표시 parentPO 등)은 그대로 둠.
+  //  예전에는 창의 값만으로 줄을 새로 만들어 수주와의 연결이 지워졌고, 그 뒤 발주해도 입고 대기 건에 발주번호가 붙지 않아 입고처리를 못 했음
+  else pos[idx]=Object.assign({},pos[idx],data);
   saveData('pos',pos);
   closeModal('modal_po');
   renderAll();
@@ -8762,7 +8805,7 @@ function poPrintText(t){
   var esc=String(t===undefined||t===null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return esc.replace(/[^\s&;]{8,}/g,function(tok){
     // 닫는 괄호·문장부호 앞, 여는 괄호 뒤에서는 줄바꿈하지 않음 (예: "(완제품" / ")" 로 갈라지는 것 방지)
-    return tok.split('').join('<wbr>').replace(/<wbr>(?=[)\]}>,.!?%])/g,'').replace(/([(\[{])<wbr>/g,'$1');
+    return Array.from(tok).join('<wbr>').replace(/<wbr>(?=[)\]}>,.!?%])/g,'').replace(/([(\[{])<wbr>/g,'$1');
   });
 }
 //  · 비고: 발주 때 직접 입력한 내용만 (예전 버전이 자동으로 붙이던 "수주: SO…" 는 제거)
@@ -8770,6 +8813,19 @@ function poNoteClean(note){
   var t=String(note||'').replace(/수주\s*[:：]\s*[A-Za-z0-9\-_]+/g,'');
   t=t.replace(/^[\s|,\/\-·]+|[\s|,\/\-·]+$/g,'').replace(/\s*\|\s*\|\s*/g,' | ');
   return t;
+}
+//  · 비고란 = 납품처(있으면) + 발주 때 직접 입력한 비고.
+//    납품처: 연결된 수주가 있으면 그 수주의 납품처(수주관리에 보이는 값). 수주와 연결되지 않은 줄(엑셀로 올린 발주 · 예전에 연결이 지워진 줄)은 발주 줄에 적힌 납품처.
+//    납품처가 없으면 예전과 똑같이 비고만 나옴
+function poRemarkHtml(p, linkedOrd){
+  p=p||{};
+  var ord=(p.fromOrder&&linkedOrd&&linkedOrd.num===p.fromOrder)?linkedOrd:null;
+  var dest=String((ord?ord.dest:p.dest)||'').replace(/\s+/g,' ').trim();
+  var note=poPrintText(poNoteClean(p.note));
+  if(!dest) return note;
+  return '<div style="font-size:10px;font-weight:700;color:#555;line-height:1.3">납품처</div>'
+    +'<div style="font-weight:700">'+poPrintText(dest)+'</div>'
+    +(note?'<div style="margin-top:4px;padding-top:3px;border-top:1px dotted #999">'+note+'</div>':'');
 }
 // ════ 발주서 출력 공통 — 출력 방식 선택(이미지/인쇄) · 이미지 미리보기 · 인쇄 창 (거래명세표와 같은 방식) ════
 // 기본 출력 방식: 마지막 선택을 기억 · 처음에는 이미지(JPEG · 예전과 같은 방식)
@@ -9054,7 +9110,7 @@ function _reprintPODo(idx,pid,mode){
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+bonghap+'</td>'
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+pallet+'</td>'
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center;font-size:10px">'+inkStr+'</td>'
-      +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left">'+poPrintText(poNoteClean(item.note))+'</td>'
+      +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left">'+poRemarkHtml(item,linkedOrd)+'</td>'
       +'</tr>';
   }).join('');
 
@@ -9082,7 +9138,7 @@ function _reprintPODo(idx,pid,mode){
     +'<div style="'+ir+'"><span style="'+il+'">작성일</span><span style="'+iv+'">'+today2+'</span></div>'
     +'<div style="display:flex"><span style="'+il+'">담당자</span><span style="'+iv+'"></span></div>'
     +'</div></div>'
-    +'<table><colgroup><col style="width:2%"><col style="width:13%"><col style="width:3%"><col style="width:6%"><col style="width:4%"><col style="width:4%"><col style="width:3%"><col style="width:9%"><col style="width:5%"><col style="width:3%"><col style="width:3%"><col style="width:5%"><col style="width:5%"><col style="width:4%"><col style="width:5%"><col style="width:14%"><col style="width:5%"></colgroup>'
+    +'<table><colgroup><col style="width:2%"><col style="width:13%"><col style="width:3%"><col style="width:6%"><col style="width:3.5%"><col style="width:3.5%"><col style="width:3%"><col style="width:8%"><col style="width:5%"><col style="width:3%"><col style="width:3%"><col style="width:5%"><col style="width:5%"><col style="width:4%"><col style="width:5%"><col style="width:14%"><col style="width:7%"></colgroup>'
     +'<thead><tr><th>No</th><th style="text-align:left">품명</th><th>골</th><th>원지구성</th><th>전장</th><th>전폭</th><th>절수</th><th>장×폭×고</th><th>적재방수</th><th>밴딩수</th><th>단수</th><th>수량(매)</th><th>납기일</th><th>봉합</th><th>파렛트</th><th>잉크</th><th>비고</th></tr></thead>'
     +'<tbody>'+tableRows
     +'<tr style="font-weight:700;background:#f5f5f5"><td colspan="11" style="text-align:right">합계</td>'
@@ -9105,11 +9161,17 @@ function cancelPO(idx){
     alert('🔒 마감된 달의 발주는 취소할 수 없습니다.');return;
   }
 
+  // 같은 수주의 미발주 줄이 남아 있으면 취소한 수량은 그 줄과 합쳐짐(아래) — 그 줄의 납기일·발주처가 다르면 미리 알림
+  //  (발주관리 [수정]으로 남은 줄만 납기일·발주처를 바꿔 둔 경우: 합친 줄은 남은 줄의 값을 따르므로, 모르고 다시 발주하면 취소한 수량까지 그 값으로 나감)
+  const mergeTo=pos.find(function(p,i){ return p&&i!==idx&&p.fromOrder===item.fromOrder&&p.product===item.product&&p.status==='미발주'; });
+  const mergeNote=(mergeTo&&((mergeTo.due||'')!==(item.due||'')||(mergeTo.vendor||'')!==(item.vendor||'')))
+    ?'\n\n※ 미발주로 남아 있는 같은 품목의 줄('+(+mergeTo.qty||0).toLocaleString()+'매 · 납기 '+(mergeTo.due||'-')+' · '+(mergeTo.vendor||'-')+')과 합쳐집니다.\n   합친 줄은 그 줄의 납기일·발주처를 따르니, 다시 발주하기 전에 발주관리에서 확인하세요.'
+    :'';
   const msg='발주완료 항목을 취소합니다.\n'
     +'품명: '+item.product+'\n'
     +'발주수량: '+(+item.qty||0).toLocaleString()+'매\n'
     +'발주번호: '+(item.num||'-')+'\n\n'
-    +'취소하면 미발주로 되돌아갑니다. 진행할까요?';
+    +(mergeNote?'취소하면 미발주로 되돌아갑니다.'+mergeNote+'\n\n진행할까요?':'취소하면 미발주로 되돌아갑니다. 진행할까요?');
   if(!confirm(msg)) return;
 
   // 같은 수주의 미발주 잔량 항목이 있으면 수량 합산, 없으면 새로 미발주 추가
@@ -9411,7 +9473,7 @@ function printPO(){
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+(bonghap||'-')+'</td>'
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center">'+(pallet||'-')+'</td>'
         +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:center;font-size:10px">'+(inkStr||'-')+'</td>'
-        +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left">'+poPrintText(poNoteClean(p.note))+'</td>'
+        +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left">'+poRemarkHtml(p,linkedOrd)+'</td>'
         +'</tr>';
     }).join('');
 
@@ -9439,7 +9501,7 @@ function printPO(){
       +'<div style="'+ir+'"><span style="'+il+'">작성일</span><span style="'+iv+'">'+today2+'</span></div>'
       +'<div style="display:flex"><span style="'+il+'">담당자</span><span style="'+iv+'"></span></div>'
       +'</div></div>'
-      +'<table><colgroup><col style="width:2%"><col style="width:13%"><col style="width:3%"><col style="width:6%"><col style="width:4%"><col style="width:4%"><col style="width:3%"><col style="width:8%"><col style="width:5%"><col style="width:3%"><col style="width:3%"><col style="width:5%"><col style="width:5%"><col style="width:4%"><col style="width:5%"><col style="width:14%"><col style="width:5%"></colgroup>'
+      +'<table><colgroup><col style="width:2%"><col style="width:13%"><col style="width:3%"><col style="width:6%"><col style="width:3.5%"><col style="width:3.5%"><col style="width:3%"><col style="width:8%"><col style="width:5%"><col style="width:3%"><col style="width:3%"><col style="width:5%"><col style="width:5%"><col style="width:4%"><col style="width:5%"><col style="width:14%"><col style="width:7%"></colgroup>'
       +'<thead><tr><th>No</th><th style="text-align:left">품명</th><th>골</th><th>원지구성</th><th>전장</th><th>전폭</th><th>절수</th><th>장×폭×고</th><th>적재방수</th><th>밴딩수</th><th>단수</th><th>수량(매)</th><th>납기일</th><th>봉합</th><th>파렛트</th><th>잉크</th><th>비고</th></tr></thead>'
       +'<tbody>'+tableRows
       +'<tr style="font-weight:700;background:#f5f5f5"><td colspan="11" style="text-align:right">합계</td>'
@@ -17476,18 +17538,21 @@ function runDataHealth(){
   add('orphan_delivery','warn','수주가 없는 출고 기록','출고(납품)의 수주번호에 해당하는 수주가 없습니다 (수주 삭제 후 남은 기록). 매출원장에는 계산되지만 재고 차감은 거래처·품명으로만 됩니다.',
     deliveries.filter(function(d){ return d.orderNum&&!onums[d.orderNum]; }).map(function(d){ return {label:(d.outNo||'')+' '+(d.date||'')+' '+(d.client||'')+' · '+(d.product||'')+' '+(+d.qty||0).toLocaleString()+'매 (수주 '+d.orderNum+')',go:{tab:'tab_delivery',search:d.outNo||d.product}}; }));
   // 7. 발주완료인데 입고 레코드 없음
-  add('po_no_stock','warn','발주완료인데 입고 대기 레코드 없음','발주가 나갔지만 입고관리에 미입고 항목이 없어 입고처리를 할 수 없습니다.',
-    pos.filter(function(p){
-      if(p.status!=='발주완료'||!p.fromOrder) return false;
+  var poNoStock=[];
+  pos.forEach(function(p){
+      if(p.status!=='발주완료'||!p.fromOrder) return;
       var _I=getIdx(); var cand=_I.get(_I.stocksByOrder,p.fromOrder).concat(p.num?_I.get(_I.stocksByPo,p.num):[]);
       // 같은 수주의 입고 기록에 옛 발주번호가 남은 것(발주취소 뒤 입고하고 다시 발주한 경우)도 이 줄의 것으로 봄 — 같은 수주의 다른 발주 줄 번호가 아닐 때.
       //  (빼놓으면 이미 들어온 발주에 [미입고 생성]을 권하게 되고, 누르면 같은 수량이 한 번 더 입고될 수 있음)
       var _own=_I.get(_I.posByOrder,p.fromOrder);
       var linked=cand.filter(function(s,ix){ return cand.indexOf(s)===ix&&s.product===p.product&&((p.num&&s.poNum===p.num)||(!s.poNum&&s.fromOrder===p.fromOrder)||(s.poNum&&s.fromOrder===p.fromOrder&&!_own.some(function(x){ return x!==p&&x.num===s.poNum&&x.product===p.product; }))); });
-      if(linked.some(function(s){ return s.status==='미입고'; })) return false;
+      if(linked.some(function(s){ return s.status==='미입고'; })) return;
       var got=linked.reduce(function(a,s){ return a+(+s.qty||0); },0);
-      return got<(+p.qty||0);
-    }).map(function(p){ return {label:(p.num||'(번호없음)')+' '+(p.vendor||'')+' · '+p.product+' '+(+p.qty||0).toLocaleString()+'매 (수주 '+p.fromOrder+')',go:{tab:'tab_po',search:p.num||p.product},fix:{type:'makeStock',num:p.num,fromOrder:p.fromOrder,product:p.product}}; }),'미입고 생성');
+      if(got<(+p.qty||0)) poNoStock.push({p:p,got:got,miss:(+p.qty||0)-got});
+  });
+  // [미입고 생성]은 아직 안 들어온 수량(miss)만 만듦 — 예전에는 발주수량 전체로 만들어, 일부가 이미 입고된 건이면 그만큼 한 번 더 입고될 수 있었음
+  add('po_no_stock','warn','발주완료인데 입고 대기 레코드 없음','발주가 나갔지만 입고관리에 미입고 항목이 없어 입고처리를 할 수 없습니다.',
+    poNoStock.map(function(x){ var p=x.p; return {label:(p.num||'(번호없음)')+' '+(p.vendor||'')+' · '+p.product+' '+(+p.qty||0).toLocaleString()+'매'+(x.got>0?' 중 '+x.got.toLocaleString()+'매 입고 — 남은 '+x.miss.toLocaleString()+'매의 대기 건 없음':'')+' (수주 '+p.fromOrder+')',go:{tab:'tab_po',search:p.num||p.product},fix:{type:'makeStock',num:p.num,fromOrder:p.fromOrder,product:p.product,qty:x.miss}}; }),'미입고 생성');
   // 8. 입고완료인데 입고일/입고번호 누락
   add('stock_incomplete','info','입고완료 항목의 입고일·입고번호 누락','선입선출 로트 계산과 입고 검색에 쓰이는 값입니다.',
     stocks.filter(function(s){ return s.status==='입고완료'&&(!isYmd(s.date)||!s.inNo); }).map(function(s){ return {label:(s.client||'')+' · '+(s.product||'')+' '+(+s.qty||0).toLocaleString()+'매 (입고일 '+(s.date||'없음')+' / 번호 '+(s.inNo||'없음')+')',go:{tab:'tab_stock',search:s.poNum||s.fromOrder||s.product}}; }));
@@ -17556,7 +17621,7 @@ function healthFix(issueId,itemIdx){
   } else if(f.type==='makeStock'){
     var pos=loadData('pos'); var p=pos.find(function(x){ return (f.num?x.num===f.num:true)&&x.fromOrder===f.fromOrder&&x.product===f.product; }); if(!p) return;
     var ord=loadData('orders').find(function(x){ return x.num===p.fromOrder; });
-    var stocks=loadData('stocks'); stocks.push({date:p.due||p.date||today(),fromOrder:p.fromOrder,poNum:p.num||'',client:ord?(ord.client||''):(p.client||''),product:p.product||'',qty:+p.qty||0,status:'미입고',receivedQty:0,inNo:''});
+    var stocks=loadData('stocks'); stocks.push({date:p.due||p.date||today(),fromOrder:p.fromOrder,poNum:p.num||'',client:ord?(ord.client||''):(p.client||''),product:p.product||'',qty:(+f.qty>0?+f.qty:(+p.qty||0)),status:'미입고',receivedQty:0,inNo:''});
     saveData('stocks',stocks); showInfoToast('✅ 미입고 레코드 생성 — 입고관리에서 입고처리할 수 있습니다.','#2E7D32');
   }
   window._lastHealth=runDataHealth(); renderHealthModal(); updateHealthCard();
