@@ -3,7 +3,8 @@
     "invites": {
       "$emailKey": {
         ".read": "auth != null && (auth.token.email.toLowerCase().replace('.', ',') === $emailKey || data.child('owner').val() === auth.uid)",
-        ".write": "auth != null && ((!data.exists() && newData.child('owner').val() === auth.uid) || data.child('owner').val() === auth.uid || auth.token.email.toLowerCase().replace('.', ',') === $emailKey)"
+        ".write": "auth != null && ((!data.exists() && newData.child('owner').isString() && (newData.child('owner').val() === auth.uid || root.child('users').child(newData.child('owner').val()).child('members').child(auth.uid).child('role').val() === 'admin')) || (data.exists() && data.child('owner').isString() && (data.child('owner').val() === auth.uid || root.child('users').child(data.child('owner').val()).child('members').child(auth.uid).child('role').val() === 'admin') && (!newData.exists() || newData.child('owner').val() === data.child('owner').val())) || (data.exists() && !newData.exists() && auth.token.email.toLowerCase().replace('.', ',') === $emailKey))",
+        ".validate": "newData.hasChildren(['owner', 'role']) && newData.child('owner').isString() && (newData.child('role').val() === 'viewer' || newData.child('role').val() === 'editor' || newData.child('role').val() === 'admin') && newData.child('invitedBy').isString() && newData.child('invitedBy').val().toLowerCase() === auth.token.email.toLowerCase()"
       }
     },
     "users": {
@@ -12,8 +13,72 @@
         "members": {
           ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin')",
           "$mid": {
-            ".write": "auth != null && $mid === auth.uid && root.child('invites').child(auth.token.email.toLowerCase().replace('.', ',')).child('owner').val() === $uid"
+            ".write": "auth != null && $mid === auth.uid && $uid !== auth.uid && (!newData.exists() || (root.child('invites').child(auth.token.email.toLowerCase().replace('.', ',')).child('owner').val() === $uid && newData.child('role').val() === root.child('invites').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val()))",
+            ".validate": "newData.hasChildren(['role']) && (newData.child('role').val() === 'viewer' || newData.child('role').val() === 'editor' || newData.child('role').val() === 'admin')"
           }
+        },
+        "joinedOwner": {
+          ".write": "auth != null && $uid === auth.uid",
+          ".validate": "newData.isString()"
+        },
+        "joinedInfo": {
+          ".write": "auth != null && $uid === auth.uid"
+        },
+        "invites": {
+          ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin')"
+        },
+        "specs": {
+          ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin' || data.parent().child('members').child(auth.uid).child('role').val() === 'editor')",
+          "$sid": {
+            ".validate": "newData.hasChildren(['data']) && newData.child('data').isString() && newData.child('data').val().length <= 4500000"
+          }
+        },
+        "devices": {
+          "$duid": {
+            "$did": {
+              ".write": "auth != null && (($duid === auth.uid && ($uid === auth.uid || root.child('users').child($uid).child('members').child(auth.uid).exists())) || $uid === auth.uid || root.child('users').child($uid).child('members').child(auth.uid).child('role').val() === 'admin')",
+              ".validate": "newData.hasChildren(['at']) && newData.child('at').isString()"
+            }
+          }
+        },
+        "rec": {
+          ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin')",
+          "changelog": {
+            "$cid": {
+              ".write": "auth != null && !data.exists() && root.child('users').child($uid).child('members').child(auth.uid).child('role').val() === 'editor'"
+            }
+          },
+          "trash": {
+            "$tid": {
+              ".write": "auth != null && root.child('users').child($uid).child('members').child(auth.uid).child('role').val() === 'editor' && (!data.exists() || (!newData.exists() && data.child('k').isString() && data.child('rec').child('_id').isString() && root.child('users').child($uid).child('rec').child(data.child('k').val()).child(data.child('rec').child('_id').val()).exists()))"
+            }
+          },
+          "$key": {
+            "$rid": {
+              ".write": "auth != null && root.child('users').child($uid).child('members').child(auth.uid).child('role').val() === 'editor'"
+            }
+          }
+        },
+        "backups2": {
+          ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin')",
+          "$bid": {
+            ".write": "auth != null && !data.exists() && root.child('users').child($uid).child('members').child(auth.uid).child('role').val() === 'editor'"
+          }
+        },
+        "backupIndex2": {
+          ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin')",
+          "$bid": {
+            ".write": "auth != null && !data.exists() && root.child('users').child($uid).child('members').child(auth.uid).child('role').val() === 'editor'"
+          }
+        },
+        "backups": {
+          ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin')"
+        },
+        "backupIndex": {
+          ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin')"
+        },
+        "rulesCheck": {
+          ".validate": "false"
         },
         "$other": {
           ".write": "auth != null && ($uid === auth.uid || data.parent().child('members').child(auth.uid).child('role').val() === 'admin' || data.parent().child('members').child(auth.uid).child('role').val() === 'editor')"
