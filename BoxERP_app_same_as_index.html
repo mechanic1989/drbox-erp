@@ -1088,7 +1088,7 @@ try{
 // ── 데이터 키 구분 ──
 //  REC_KEYS : 레코드 배열 → 클라우드에는 users/{owner}/rec/{key}/{_id} 로 레코드 단위 저장 (동시 편집 시 서로 덮어쓰지 않음)
 //  OBJ_KEYS : 단일 객체/값 → users/{owner}/{key} 그대로 저장
-var REC_KEYS = ['orders','pos','stocks','deliveries','master','clients','dests','devCosts','quotes','collections','closings','returns','paperPrices','tools','invoices','trash','changelog'];
+var REC_KEYS = ['orders','pos','stocks','deliveries','master','clients','dests','devCosts','quotes','collections','closings','returns','stockAdj','paperPrices','tools','invoices','trash','changelog']; // stockAdj: 재고 조정 (v2.5.1)
 var OBJ_KEYS = ['mycompany','monthly_profit_goal','settings'];
 var META_KEYS = ['trash','changelog']; // 변경이력·휴지통 자체는 이력 대상에서 제외
 var fbSyncKeys = REC_KEYS.concat(OBJ_KEYS);
@@ -1512,6 +1512,7 @@ function _fbRenderAfterSync(key){
     else if(key==='closings'){ if(vis('tab_closing')&&typeof renderClosing==='function') renderClosing(); }
     else if(key==='invoices'){ var _cl=document.getElementById('tab_closing'); if(_cl&&_cl.style.display!=='none'&&typeof renderInvoicePrep==='function') renderInvoicePrep(); }
     else if(key==='returns'){ if(vis('tab_returns')&&typeof renderReturns==='function') renderReturns(); }
+    else if(key==='stockAdj'){ if(vis('tab_inventory')&&typeof renderInventory==='function') renderInventory(); if(typeof _adjRefreshModal==='function') _adjRefreshModal(); }
     else if(key==='paperPrices'){ if(typeof applyPaperTable==='function') applyPaperTable(); }
     else if(key==='settings'){ var _cp=document.getElementById('tab_collection'); if(_cp&&_cp.style.display!=='none'&&typeof renderCollection==='function') renderCollection(); }
     else if(key==='tools'){ var _tp=document.getElementById('tab_tools'); if(_tp&&_tp.style.display!=='none'&&typeof renderTools==='function') renderTools(); }
@@ -1978,7 +1979,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.5.0</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.5.1</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -2431,7 +2432,7 @@ if(fbReady){
   <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
     <input id="order_search" placeholder="거래처/품명/수주번호 검색..." oninput="debounceRender('renderOrders','orders')" style="padding:6px 10px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px;width:200px">
     <select id="order_filter_status" onchange="renderOrders()" style="padding:6px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px">
-      <option value="">전체</option><option value="발주전">발주 전</option><option value="발주완료">발주완료</option><option value="재고출고">📦 재고 출고</option>
+      <option value="">전체</option><option value="미완료">🚚 미완료 (출고 전·부분출고)</option><option value="완료">✅ 완료 (출고완료·잔량 마감)</option><option value="발주전">발주 전</option><option value="발주완료">발주완료</option><option value="재고출고">📦 재고 출고</option>
     </select>
   </div>
   <div style="overflow-x:auto">
@@ -5719,7 +5720,7 @@ function _editGoneOk(rawIdx,idx,label){
 }
 // ── 변경이력 / 휴지통 ──
 var CHANGELOG_MAX=500, TRASH_MAX=300, TRASH_BULK_LIMIT=200;
-var REC_LABELS={orders:'수주',pos:'발주',stocks:'입고',deliveries:'출고',master:'제품',clients:'거래처',dests:'납품처',devCosts:'개발비',quotes:'견적',collections:'수금',closings:'마감',returns:'반품/불량',paperPrices:'원지단가표',tools:'목형·인쇄판',invoices:'세금계산서'};
+var REC_LABELS={orders:'수주',pos:'발주',stocks:'입고',deliveries:'출고',master:'제품',clients:'거래처',dests:'납품처',devCosts:'개발비',quotes:'견적',collections:'수금',closings:'마감',returns:'반품/불량',stockAdj:'재고 조정',paperPrices:'원지단가표',tools:'목형·인쇄판',invoices:'세금계산서'};
 function recLabel(k,r){
   if(!r||typeof r!=='object') return REC_LABELS[k]||k;
   var j=function(){ return Array.prototype.filter.call(arguments,function(x){ return x!==undefined&&x!==null&&x!==''; }).join(' '); };
@@ -5736,6 +5737,7 @@ function recLabel(k,r){
     case 'collections': return j(r.client,r.yearMonth);
     case 'closings': return j(r.ym||r.yearMonth||r.month);
     case 'returns': return j(r.date,r.type,r.client,r.product);
+    case 'stockAdj': return j(r.date,'재고 조정',r.client,r.product,((+r.qty>0)?'+':'')+(+r.qty||0).toLocaleString()+'매');
     case 'paperPrices': return j(r.date||r.from,r.memo);
     case 'tools': return j(r.type,r.name);
     case 'invoices': return j(r.ym,r.client,r.status);
@@ -5747,6 +5749,7 @@ function recLabel(k,r){
 var REC_FIELD_KO_BY={
   devCosts:{date:'등록일',id:'개발비 번호',reason:'사유',supplier:'매입처'},
   returns:{date:'날짜',type:'구분',reason:'사유',handler:'처리 담당',qty:'수량'},
+  stockAdj:{date:'조정일',qty:'조정 수량(±매)',reason:'사유',note:'메모',unitCost:'매입단가(원/매)',actual:'실사 수량',before:'조정 전 재고'},
   tools:{vendor:'제작처',status:'상태',devCostId:'연결 개발비',count:'사용 횟수'},
   quotes:{date:'견적일',notes:'특기사항'},
   collections:{client:'거래처'},
@@ -6055,6 +6058,9 @@ function _freeLotBuild(I){
   });
   // 반품 재고 복귀 (저장된 복귀 원가 → 제품마스터 매입단가)
   var rets=loadData('returns'); if(Array.isArray(rets)) rets.forEach(function(r,ix){ if(!r||typeof r!=='object'||!r.client) return; var q=+r.restockQty||0; if(!(q>0)) return; var u=_hasNum(r.restockUnitCost)?+r.restockUnitCost:((findMasterRec(r.client,r.product)||{}).buy_price||0); addLot(_itemKeyOf(r.client,r.product),{date:String(r.date||''),qty:q,unit:+u||0,ix:1e7+ix}); });
+  // 재고 조정(v2.5.1): + 는 로트(조정 때 적은 매입단가, 없으면 제품마스터 매입단가) · − 는 그 날짜에 꺼내 쓴 것
+  var adjCons=[];
+  _adjList().forEach(function(a,ix){ var q=+a.qty||0; if(!q) return; var k=_itemKeyOf(a.client,a.product); if(q>0){ var u=(+a.unitCost>0)?+a.unitCost:(+(findMasterRec(a.client,a.product)||{}).buy_price||0); addLot(k,{date:String(a.date||''),qty:q,unit:u,ix:100000+ix}); } else adjCons.push({k:k,c:{d:{date:String(a.date||''),outNo:'',_adj:true},ix:100000+ix,qty:-q}}); });
   // 꺼내 쓴 출고: 수주마다 날짜순으로, 그 수주 입고를 넘는 만큼
   var byOrder=Object.create(null);
   loadData('deliveries').forEach(function(d,ix){ if(!d||!d.orderNum||!I.ordersByNum[d.orderNum]) return; var q=+(d.qty||d.outQty)||0; if(q<=0) return; (byOrder[d.orderNum]||(byOrder[d.orderNum]=[])).push({d:d,ix:ix,q:q}); });
@@ -6064,6 +6070,7 @@ function _freeLotBuild(I){
       var fromOwn=Math.max(0,Math.min(x.q,own-used)); used+=x.q; if(x.q-fromOwn>0) (cons[k]||(cons[k]=[])).push({d:x.d,ix:x.ix,qty:x.q-fromOwn});
     });
   });
+  adjCons.forEach(function(x){ (cons[x.k]||(cons[x.k]=[])).push(x.c); });
   var F={byId:Object.create(null),byRef:new Map()};
   Object.keys(cons).forEach(function(k){
     var L=(lots[k]||[]).sort(function(a,b){ return byD(a,b)||(a.ix-b.ix); }), li=0, left=L.length?L[0].qty:0;
@@ -6233,21 +6240,22 @@ function itemStockInfo(client,product){
   var I=getIdx(), M=I._itemStock;
   if(!M){
     M=I._itemStock=Object.create(null);
-    var get=function(c,p){ var k=_itemKeyOf(c,p); return M[k]||(M[k]={received:0,restocked:0,delivered:0,onHand:0,reserved:0,free:0,claimed:0}); };
+    var get=function(c,p){ var k=_itemKeyOf(c,p); return M[k]||(M[k]={received:0,restocked:0,adjusted:0,delivered:0,onHand:0,reserved:0,free:0,claimed:0}); };
     var recvBy=Object.create(null);
     loadData('stocks').forEach(function(s){ if(!s||s.status!=='입고완료') return; var q=+s.qty||0; get(s.client,s.product).received+=q; if(s.fromOrder) recvBy[s.fromOrder]=(recvBy[s.fromOrder]||0)+q; });
     loadData('deliveries').forEach(function(d){ if(!d) return; var o=I.ordersByNum[d.orderNum]; var c=o?o.client:d.client, p=o?o.product:d.product; if(!c&&!p) return; get(c,p).delivered+=(+(d.qty||d.outQty||0)); });
     var rets=loadData('returns'); if(Array.isArray(rets)) rets.forEach(function(r){ if(!r) return; var q=+r.restockQty||0; if(q>0) get(r.client,r.product).restocked+=q; });
+    _adjList().forEach(function(a){ get(a.client,a.product).adjusted+=(+a.qty||0); }); // 재고 조정(실사 차이 ±) — v2.5.1
     loadData('orders').forEach(function(o){
       if(!o||o.status==='취소') return;
       if(o.stockShip){ var cl=orderRemainQty(o); if(cl>0) get(o.client,o.product).claimed+=cl; }
       var rc=recvBy[o.num]||0; if(rc<=0) return;
       var rs=Math.max(0,Math.min(rc,(+o.qty||0)-orderClosedQty(o))-(+o.outQty||0)); if(rs>0) get(o.client,o.product).reserved+=rs;
     });
-    Object.keys(M).forEach(function(k){ var r=M[k]; r.onHand=r.received+r.restocked-r.delivered; r.free=Math.max(0,r.onHand-r.reserved); });
+    Object.keys(M).forEach(function(k){ var r=M[k]; r.onHand=r.received+r.restocked+r.adjusted-r.delivered; r.free=Math.max(0,r.onHand-r.reserved); });
   }
   var hit=M[_itemKeyOf(client,product)];
-  return hit?Object.assign({},hit):{received:0,restocked:0,delivered:0,onHand:0,reserved:0,free:0,claimed:0};
+  return hit?Object.assign({},hit):{received:0,restocked:0,adjusted:0,delivered:0,onHand:0,reserved:0,free:0,claimed:0};
 }
 function findDest(client,destName){
   var n=_nm(destName); if(!n) return null;
@@ -7613,12 +7621,15 @@ function calcMasterDims(){
   calcMasterPalletQty();
 }
 
+// 수주관리 상태 필터 기억 되살리기 (v2.5.1) — 첫 그리기 전에 한 번
+(function(){ try{ var v=localStorage.getItem('order_filter_status'); if(!v) return; var run=function(){ var sel=document.getElementById('order_filter_status'); if(sel&&Array.prototype.some.call(sel.options,function(op){ return op.value===v; })) sel.value=v; }; if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',run); else run(); }catch(e){} })();
 // ════ 수주 렌더링 ════
 function renderOrders(){
   const orders=loadData('orders');
   const I=getIdx();
   const q=(document.getElementById('order_search')?.value||'').toLowerCase();
   const stFilter=document.getElementById('order_filter_status')?.value||'';
+  try{ localStorage.setItem('order_filter_status',stFilter); }catch(e){} // 이 기기에 기억 (v2.5.1) — 다른 화면에 갔다 와도·앱을 다시 열어도 그대로
   const tbody=document.getElementById('order_tbody'); if(!tbody) return;
   const S=function(v){ return (v===undefined||v===null)?'':String(v); }, e=_ddEsc;
   // 카운터 집계 — '재고에서 출고' 수주는 발주할 것이 없으므로 '발주 전'에 세지 않음
@@ -7637,6 +7648,9 @@ function renderOrders(){
     if(stFilter==='발주전'&&(hasPOForFilter||o.stockShip)) return;
     if(stFilter==='발주완료'&&!hasPOForFilter) return;
     if(stFilter==='재고출고'&&!o.stockShip) return;
+    // 미완료 = 아직 나갈 수량이 남은 수주 · 완료 = 다 나갔거나 잔량 마감한 수주(취소 포함) — 납기일을 바꾸거나 검색할 때 끝난 수주가 섞이지 않게 (v2.5.1)
+    if(stFilter==='미완료'&&(o.status==='취소'||orderRemainQty(o)<=0)) return;
+    if(stFilter==='완료'&&!(o.status==='취소'||orderRemainQty(o)<=0)) return;
     list.push({o:o,i:i});
   });
   list.sort(function(a,b){ var da=S(a.o.date), db=S(b.o.date); if(da!==db) return da<db?1:-1; return b.i-a.i; });
@@ -12872,9 +12886,10 @@ function editStockQty(idx){
     +'<div style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center">'
       +'<label for="stk_ed_qty" style="font-size:12px;font-weight:700;color:#555">입고수량</label><input type="number" id="stk_ed_qty" value="'+curQty+'" min="1" inputmode="numeric" style="width:140px;padding:7px 10px;border:2px solid #689F38;border-radius:6px;font-size:14px;font-weight:700;text-align:right">'
       +'<label for="stk_ed_price" style="font-size:12px;font-weight:700;color:#555">매입단가(원/매)</label><input type="number" id="stk_ed_price" value="'+(+bp||0)+'" min="0" style="width:140px;padding:7px 10px;border:2px solid #689F38;border-radius:6px;font-size:14px;text-align:right">'
+      +'<label for="stk_ed_date" style="font-size:12px;font-weight:700;color:#555">입고일</label><input type="date" id="stk_ed_date" value="'+_ddEsc(s.date||'')+'" style="width:150px;padding:6px 8px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px" title="입고일을 바꾸면 매입원장·재고 로트(선입선출)의 날짜가 함께 바뀜 (입고번호는 그대로)">'
     +'</div>'
     +'<label style="display:flex;gap:6px;align-items:center;margin-top:10px;font-size:11px;color:#555;cursor:pointer"><input type="checkbox" id="stk_ed_back" checked> 줄인 수량이 아직 들어올 수량이면 미입고로 되돌림 (예정보다 적게 줄일 때)</label>'
-    +'<div style="font-size:11px;color:#666;line-height:1.6;margin-top:8px">※ 입고일·입고번호는 그대로입니다. 매입원장·손익의 그 달 매입이 바뀝니다.</div>'
+    +'<div style="font-size:11px;color:#666;line-height:1.6;margin-top:8px">※ 입고번호는 그대로입니다. 수량·단가·입고일을 바꾸면 매입원장·손익의 그 달 매입이 바뀝니다(마감한 달로는 옮길 수 없음).</div>'
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button id="stk_ed_cancel" style="padding:9px 20px;background:#888;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">취소</button><button id="stk_ed_ok" style="padding:9px 20px;background:#558B2F;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">저장</button></div>'
     +'</div>';
   document.body.appendChild(overlay);
@@ -12884,7 +12899,14 @@ function editStockQty(idx){
     const nq=Number(document.getElementById('stk_ed_qty').value), np=Number(document.getElementById('stk_ed_price').value);
     if(!(nq>=1)||Math.floor(nq)!==nq){ alert('입고수량은 1 이상의 정수(매)로 입력하세요.'); return; }
     if(!(np>=0)){ alert('매입단가를 확인하세요.'); return; }
-    if(nq===curQty&&np===(+bp||0)){ close(); return; }
+    // 입고일 변경 (v2.5.1): 실제 있는 날짜 · 마감한 달로는 못 옮김 · 그 수주의 출고보다 뒤 날짜면 한 번 확인
+    const nd=_vDate(document.getElementById('stk_ed_date'),{label:'입고일',required:true}); if(!nd) return;
+    const dateChanged=nd!==String(s.date||'');
+    if(dateChanged){
+      if(!closedMonthGuard([nd],'입고일 변경')) return;
+      try{ var _I0=getIdx(), _late=s.fromOrder?_I0.get(_I0.delivsByOrder,s.fromOrder).filter(function(d){ return d&&String(d.date||'')<nd; }):[]; if(_late.length&&!confirm('⚠️ 이 수주의 출고('+_late.map(function(d){ return d.date; }).sort()[0]+')가 새 입고일('+nd+')보다 앞섭니다 — 그 출고는 입고 전에 나간 것으로 보여 재고 계산에서 어긋나 보일 수 있습니다.\n\n그래도 바꿀까요?')) return; }catch(e){}
+    }
+    if(nq===curQty&&np===(+bp||0)&&!dateChanged){ close(); return; }
     const all=loadData('stocks'), cur=all[idx];
     if(!cur||cur.status!=='입고완료'||(cur!==s&&(!cur._id||cur._id!==s._id))||(+cur.qty||0)!==curQty){ close(); renderAll(); alert('⚠️ 그 사이 입고 목록이 바뀌어 처리하지 못했습니다.'); return; }
     if(nq<curQty){ const chk=_stockCancelCheck(cur,curQty-nq); if(chk.block){ alert('🚫 '+chk.block); return; } if(chk.warn&&!confirm('⚠️ '+chk.warn+'\n\n계속할까요?')) return; }
@@ -12901,6 +12923,7 @@ function editStockQty(idx){
     }
     var newPlan=plan+take;
     cur.qty=nq; cur.receivedQty=nq;
+    if(dateChanged) cur.date=nd;
     if(nq>newPlan) cur.overQty=nq-newPlan; else delete cur.overQty;
     if(np>0) cur.buyUnitPrice=np; else delete cur.buyUnitPrice;
     if(backQty>0){
@@ -12911,7 +12934,7 @@ function editStockQty(idx){
     close();
     if(saveData('stocks',all)===false) return;
     renderAll();
-    try{ showInfoToast('✏️ '+(cur.product||'')+' 입고 '+curQty.toLocaleString()+' → '+nq.toLocaleString()+'매'+(np!==(+bp||0)?' · 매입단가 '+np.toLocaleString()+'원':'')+(backQty>0?' · '+backQty.toLocaleString()+'매는 미입고로':'')+(take>0?' · 남은 미입고에서 '+take.toLocaleString()+'매를 뺌':''),'#33691E'); }catch(e){}
+    try{ showInfoToast('✏️ '+(cur.product||'')+' 입고 '+curQty.toLocaleString()+' → '+nq.toLocaleString()+'매'+(np!==(+bp||0)?' · 매입단가 '+np.toLocaleString()+'원':'')+(dateChanged?' · 입고일 '+nd:'')+(backQty>0?' · '+backQty.toLocaleString()+'매는 미입고로':'')+(take>0?' · 남은 미입고에서 '+take.toLocaleString()+'매를 뺌':''),'#33691E'); }catch(e){}
   };
 }
 // ════ 입고 잔량 마감 ════
@@ -14402,6 +14425,12 @@ function buildInventoryRows(){
     var r=ensure(rt.client,rt.product); r.inStock+=q; r.restocked+=q;
     r.lots.push({idx:'R'+i,date:rt.date||'',inNo:'반품 복귀',poNum:'',fromOrder:rt.orderNum||'',qty:q,remain:q,used:0,age:0,buy:0,isReturn:true});
   });
+  // 재고 조정(v2.5.1): + 는 그 날짜의 로트(매입단가는 조정 때 적은 값), − 는 그 날짜의 출고처럼 앞 로트부터 빠짐
+  _adjList().forEach(function(a,i){
+    var q=+a.qty||0; if(!q) return; var r=ensure(a.client,a.product);
+    if(q>0){ r.inStock+=q; r.adjusted=(r.adjusted||0)+q; r.lots.push({idx:'A'+i,date:a.date||'',inNo:'📐 조정'+(a.reason?' · '+a.reason:''),poNum:'',fromOrder:'',qty:q,remain:q,used:0,age:0,buy:+a.unitCost||0,isAdj:true}); }
+    else { r.inStock+=q; r.adjusted=(r.adjusted||0)+q; r.outs.push({date:a.date||'',qty:-q,outNo:'📐 조정'+(a.reason?' · '+a.reason:''),isAdj:true}); }
+  });
   var orderMap={}; orders.forEach(function(o){ if(o) orderMap[o.num]=o; });
   deliveries.forEach(function(d){
     if(!d) return;
@@ -14465,6 +14494,88 @@ function invLongStockList(){
 function invQuickFilter(v){ var f=document.getElementById('inv_filter'); if(f){ f.value=(f.value===v)?'all':v; } renderInventory(); }
 // 재고시트 줄의 [📦 발주] — 그 품목의 재고용 발주 창 (줄 순번으로 — 이름을 onclick 에 넣지 않음)
 function invOpenStockPO(i){ var r=(window._invRows||[])[i]; if(!r) return; openStockPOModal(r.client,r.product,Math.max(0,+r.shortQty||0)); }
+// ════ 재고 조정 (v2.5.1) — 실사 수량과 앱 재고가 다를 때 차이를 기록 (재고 수량만 맞춤 · 매입원장·손익·미수금은 그대로) ════
+//  stockAdj[{date, client, product, qty(±매), reason, note, actual(실사), before(조정 전 앱 재고), unitCost(+ 조정의 매입단가)}]
+//  + 조정 = 그 날짜의 로트(재고시트·선입선출 원가) · − 조정 = 그 날짜의 출고처럼 오래된 로트부터 빠짐. 변경이력·휴지통·동기화·백업 모두 일반 레코드와 같음
+function _adjList(){ var a=loadData('stockAdj'); return Array.isArray(a)?a.filter(function(r){ return r&&typeof r==='object'&&(r.client!==undefined||r.product!==undefined); }):[]; }
+function invOpenAdj(i){ var r=(window._invRows||[])[i]; if(!r) return; openStockAdjModal(r.client,r.product); }
+var _adjCtx=null;
+function openStockAdjModal(client,product){
+  if(typeof canDo==='function'&&!canDo('edit')){ if(typeof permAlert==='function') permAlert('edit'); return; }
+  client=canonClient(client||''); var m=findMasterRec(client,product,true); if(m) product=_nm(m.product); else product=_nm(product);
+  _adjCtx={client:client,product:product};
+  var old=document.getElementById('stk_adj_overlay'); if(old) old.remove();
+  var overlay=document.createElement('div'); overlay.className='dyn-overlay'; overlay.id='stk_adj_overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML='<div style="background:#fff;border-radius:12px;padding:18px 20px;width:540px;max-width:94vw;max-height:92vh;overflow:auto;box-sizing:border-box;box-shadow:0 8px 32px rgba(0,0,0,0.3)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div style="font-size:15px;font-weight:700;color:#00695C">📐 재고 조정 (실사 맞추기)</div><button type="button" id="stk_adj_x" title="닫기" style="background:none;border:none;font-size:18px;cursor:pointer;min-width:44px;min-height:44px">✕</button></div>'
+    +'<div id="stk_adj_body"></div></div>';
+  document.body.appendChild(overlay);
+  document.getElementById('stk_adj_x').onclick=_adjClose;
+  _adjRenderBody();
+  try{ var el=document.getElementById('stk_adj_actual'); if(el) el.focus(); }catch(e){}
+}
+function _adjClose(){ var o=document.getElementById('stk_adj_overlay'); if(o) o.remove(); _adjCtx=null; }
+function _adjRefreshModal(){ if(document.getElementById('stk_adj_overlay')&&_adjCtx) _adjRenderBody(); }
+function _adjRowsFor(client,product){
+  var key=_itemKeyOf(client,product);
+  return _adjList().map(function(a,i){ return {a:a,i:i}; }).filter(function(x){ return _itemKeyOf(x.a.client,x.a.product)===key; })
+    .sort(function(x,y){ var dx=String(x.a.date||''), dy=String(y.a.date||''); if(dx!==dy) return dx<dy?1:-1; return y.i-x.i; });
+}
+function _adjRenderBody(){
+  var body=document.getElementById('stk_adj_body'); if(!body||!_adjCtx) return;
+  var client=_adjCtx.client, product=_adjCtx.product, info=itemStockInfo(client,product), m=findMasterRec(client,product,true);
+  var row=null; try{ row=buildInventoryRows().filter(function(r){ return r.client===client&&r.product===product; })[0]||null; }catch(e){}
+  var onHand=+info.onHand||0, mBuy=m?(+m.buy_price||0):0, list=_adjRowsFor(client,product), e=_ddEsc, f=function(n){ return (+n||0).toLocaleString(); };
+  body.innerHTML=
+     '<div style="font-size:12px;color:#333;line-height:1.7;padding:8px 10px;background:#E0F2F1;border-radius:8px;margin-bottom:10px"><div><b>'+e(client||'(거래처 없음)')+'</b> · '+e(product)+'</div>'
+    +'<div>앱 재고 <b id="stk_adj_onhand" style="font-size:14px;color:'+(onHand<0?'#C62828':'#00695C')+'">'+f(onHand)+'매</b>'+(row&&row.unmatchedOut>0?' <span style="color:#C62828">(입고 로트보다 출고가 '+f(row.unmatchedOut)+'매 많음)</span>':'')
+    +'<div style="font-size:11px;color:#666">= 입고 '+f(info.received)+' + 반품 복귀 '+f(info.restocked)+' + 조정 '+((+info.adjusted||0)>0?'+':'')+f(info.adjusted)+' − 출고 '+f(info.delivered)+'</div></div></div>'
+    +'<div style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center">'
+    +'<label for="stk_adj_actual" style="font-size:12px;font-weight:700;color:#555">실제 수량(실사)</label><div><input type="number" id="stk_adj_actual" inputmode="numeric" min="0" placeholder="세어 본 수량" style="width:140px;padding:7px 10px;border:2px solid #26A69A;border-radius:6px;font-size:14px;font-weight:700;text-align:right"> <span id="stk_adj_diff" style="font-size:12px;color:#555;margin-left:6px">차이 —</span></div>'
+    +'<label for="stk_adj_date" style="font-size:12px;font-weight:700;color:#555">조정일</label><input type="date" id="stk_adj_date" value="'+e(today())+'" style="width:150px;padding:6px 8px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px">'
+    +'<label for="stk_adj_reason" style="font-size:12px;font-weight:700;color:#555">사유</label><select id="stk_adj_reason" style="padding:6px 8px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px;max-width:200px"><option>실사 차이</option><option>파손·폐기</option><option>분실</option><option>입고 누락</option><option>출고 누락</option><option>기타</option></select>'
+    +'<label for="stk_adj_note" style="font-size:12px;font-weight:700;color:#555">메모</label><input type="text" id="stk_adj_note" maxlength="100" placeholder="(선택)" style="padding:6px 8px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px">'
+    +'<label for="stk_adj_cost" id="stk_adj_cost_lbl" style="font-size:12px;font-weight:700;color:#555;display:none">매입단가(원/매)</label><input type="number" id="stk_adj_cost" value="'+mBuy+'" min="0" inputmode="numeric" style="width:140px;padding:6px 8px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px;text-align:right;display:none">'
+    +'</div>'
+    +'<div style="font-size:11px;color:#666;line-height:1.6;margin-top:8px">※ 재고 수량만 맞춥니다 — 매입원장·손익·미수금은 바뀌지 않습니다. 늘리는 조정은 그 날짜의 로트로 들어가고(재고금액은 위 매입단가로), 줄이는 조정은 오래된 로트부터 빠집니다. 실제로 들어온 물건이면 조정 대신 입고관리에서 [입고처리]하세요.</div>'
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" id="stk_adj_cancel" style="padding:9px 18px;background:#888;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;min-height:44px">닫기</button><button type="button" id="stk_adj_ok" style="padding:9px 18px;background:#00897B;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;min-height:44px">📐 조정 저장</button></div>'
+    +'<div style="margin-top:14px;font-size:12px;font-weight:700;color:#455A64">이 품목의 조정 기록 '+list.length+'건</div>'
+    +(list.length?'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:4px"><thead><tr style="background:#ECEFF1;color:#455A64"><th style="padding:4px 6px;text-align:left">조정일</th><th style="padding:4px 6px;text-align:right">조정</th><th style="padding:4px 6px;text-align:left">사유 · 메모</th><th style="padding:4px 6px;text-align:right">실사</th><th></th></tr></thead><tbody>'
+      +list.map(function(x){ var a=x.a, q=+a.qty||0; return '<tr><td style="padding:4px 6px">'+e(a.date||'-')+'</td><td style="padding:4px 6px;text-align:right;font-weight:700;color:'+(q>0?'#1B5E20':'#C62828')+'">'+(q>0?'+':'')+f(q)+'매</td><td style="padding:4px 6px">'+e(a.reason||'')+(a.note?' · '+e(a.note):'')+'</td><td style="padding:4px 6px;text-align:right;color:#777">'+(_hasNum(a.actual)?f(a.actual):'-')+'</td><td style="padding:2px 4px;text-align:right"><button type="button" data-i="'+x.i+'" class="stk-adj-del" style="padding:3px 8px;background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A;border-radius:4px;font-size:10px;cursor:pointer;min-height:28px">삭제</button></td></tr>'; }).join('')
+      +'</tbody></table></div>':'<div style="font-size:11px;color:#999;margin-top:4px">없음</div>');
+  var costOk=(typeof canSee!=='function')||canSee('cost'); // 원가를 가린 역할(WP-L)에게는 매입단가 칸을 보이지 않음 (값은 제품마스터 단가로 저장)
+  var upd=function(){ var v=document.getElementById('stk_adj_actual').value, d=document.getElementById('stk_adj_diff'), cl=document.getElementById('stk_adj_cost_lbl'), ci=document.getElementById('stk_adj_cost'); if(String(v).trim()===''||isNaN(+v)){ d.textContent='차이 —'; cl.style.display='none'; ci.style.display='none'; return; } var diff=Math.round(+v)-onHand; d.innerHTML='차이 <b style="color:'+(diff>0?'#1B5E20':(diff<0?'#C62828':'#777'))+'">'+(diff>0?'+':'')+f(diff)+'매</b>'+(diff===0?' (맞음)':''); var show=diff>0&&costOk; cl.style.display=show?'':'none'; ci.style.display=show?'':'none'; };
+  document.getElementById('stk_adj_actual').oninput=upd;
+  document.getElementById('stk_adj_cancel').onclick=_adjClose;
+  document.getElementById('stk_adj_ok').onclick=function(){ _adjSave(client,product,onHand); };
+  Array.prototype.forEach.call(body.querySelectorAll('.stk-adj-del'),function(b){ b.onclick=function(){ _adjDelete(+b.getAttribute('data-i')); }; });
+}
+function _adjSave(client,product,onHand){
+  if(typeof canDo==='function'&&!canDo('edit')){ if(typeof permAlert==='function') permAlert('edit'); return; }
+  var actual=_vNum(document.getElementById('stk_adj_actual'),{label:'실제 수량',min:0,int:true}); if(actual===null) return;
+  var diff=actual-onHand;
+  if(diff===0){ alert('앱 재고와 같습니다 — 조정할 것이 없습니다.'); return; }
+  var date=_vDate(document.getElementById('stk_adj_date'),{label:'조정일',required:true}); if(!date) return;
+  var reason=(document.getElementById('stk_adj_reason')||{}).value||'실사 차이', note=String((document.getElementById('stk_adj_note')||{}).value||'').trim();
+  var cost=0; if(diff>0){ cost=_vNum(document.getElementById('stk_adj_cost'),{label:'매입단가',min:0,int:true,allowEmpty:true}); if(cost===null) return; cost=+cost||0; }
+  var f=function(n){ return (+n||0).toLocaleString(); };
+  if(!confirm('재고 조정을 저장합니다.\n\n'+client+' · '+product+'\n앱 재고 '+f(onHand)+'매 → 실사 '+f(actual)+'매 (차이 '+(diff>0?'+':'')+f(diff)+'매)\n조정일 '+date+' · '+reason+(note?' · '+note:'')+'\n\n매입원장·손익은 바뀌지 않습니다. 진행할까요?')) return;
+  var list=loadData('stockAdj'); if(!Array.isArray(list)) list=[];
+  var rec={date:date,client:client,product:product,qty:diff,reason:reason,note:note,actual:actual,before:onHand}; if(diff>0&&cost>0) rec.unitCost=cost;
+  list.push(rec);
+  if(saveData('stockAdj',list)===false) return;
+  renderAll();
+  try{ showInfoToast('📐 재고 조정 '+(diff>0?'+':'')+f(diff)+'매 — '+product+' (앱 재고 '+f(actual)+'매)','#00695C'); }catch(e){}
+  _adjRenderBody();
+}
+function _adjDelete(i){
+  if(typeof canDo==='function'&&!canDo('edit')){ if(typeof permAlert==='function') permAlert('edit'); return; }
+  var list=loadData('stockAdj'); var a=list[i]; if(!a) return;
+  if(!confirm('이 조정 기록을 지울까요?\n'+(a.date||'')+' · '+(a.client||'')+' · '+(a.product||'')+' · '+((+a.qty>0)?'+':'')+(+a.qty||0).toLocaleString()+'매\n\n(휴지통에 보관되어 되살릴 수 있습니다)')) return;
+  deleteWithUndo('stockAdj',i,'재고 조정 '+(a.product||''),function(){ renderAll(); _adjRenderBody(); });
+}
+
 function invStatusBadge(r){
   var b=function(t,bg,c){ return '<span style="background:'+bg+';color:'+c+';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap">'+t+'</span>'; };
   var out=[];
@@ -14488,7 +14599,7 @@ function renderInventory(){
   var filter=(document.getElementById('inv_filter')||{}).value||'all';
   var longDays=invLongDays();
   var lbl=document.getElementById('inv_long_days_lbl'); if(lbl) lbl.textContent='('+longDays+'일↑)';
-  var all=buildInventoryRows().filter(function(r){ return r.inStock>0||r.pending>0||r.unordered>0||r.safety>0||r.orderRemain>0; });
+  var all=buildInventoryRows().filter(function(r){ return r.inStock>0||r.pending>0||r.unordered>0||r.safety>0||r.orderRemain>0||(r.adjusted||0)!==0; }); // 조정 기록이 있는 품목은 재고 0 이어도 보임 (v2.5.1)
   var shortAll=all.filter(function(r){ return r.alertLevel>=2; });
   var longAll=all.filter(function(r){ return r.isLong; });
   var rows=all;
@@ -14532,7 +14643,9 @@ function renderInventory(){
       +'<td style="padding:6px 4px;text-align:center">'+(hasLots?'<button onclick="invToggleLots('+i+')" id="inv_tg_'+i+'" title="선입선출 로트 보기" style="background:none;border:1px solid #B2DFDB;border-radius:4px;color:#00695C;cursor:pointer;font-size:11px;padding:2px 6px">▸</button>':'')+'</td>'
       +'<td style="padding:8px 10px;font-size:12px;color:#555">'+invEsc(r.client)+'</td>'
       +'<td style="padding:8px 10px;font-size:12px;font-weight:600;color:#1A237E">'+invEsc(r.product)+(r.masterCode?'<div style="font-size:9px;color:#999;font-weight:400;font-family:monospace">'+invEsc(r.masterCode)+'</div>':'')+'</td>'
-      +'<td style="padding:8px 10px;font-size:13px;font-weight:700;color:'+(r.inStock>0?(r.shortSafety?'#C62828':'#1B5E20'):'#bbb')+';text-align:right">'+(r.inStock>0?r.inStock.toLocaleString()+' 매':'-')+'</td>'
+      +'<td style="padding:8px 10px;font-size:13px;font-weight:700;color:'+(r.inStock>0?(r.shortSafety?'#C62828':'#1B5E20'):'#bbb')+';text-align:right;white-space:nowrap">'+(r.inStock>0?r.inStock.toLocaleString()+' 매':'-')
+        // 📐 재고 조정 (v2.5.1) — 현재고 옆 작은 버튼: 실사 수량과 다르면 차이를 조정 (재고 수량만 — 매입원장·손익은 그대로)
+        +' <button onclick="invOpenAdj('+i+')" title="재고 조정 — 세어 본 수량과 다르면 차이를 조정 (재고 수량만 · 매입원장·손익은 그대로)" style="padding:1px 5px;background:#ECEFF1;color:#37474F;border:1px solid #B0BEC5;border-radius:4px;font-size:10px;cursor:pointer;vertical-align:middle;min-height:22px">📐</button></td>'
       +'<td style="padding:6px 10px;text-align:right">'+safetyCell+'</td>'
       +'<td style="padding:8px 10px;font-size:13px;font-weight:700;color:'+(r.pending>0?'#E65100':'#bbb')+';text-align:right" title="발주서를 낸 미입고 수량">'+(r.pending>0?r.pending.toLocaleString()+' 매':'-')+'</td>'
       +'<td style="padding:8px 10px;font-size:12px;font-weight:700;color:'+(r.unordered>0?'#F57F17':'#bbb')+';text-align:right" title="아직 발주하지 않은 수주 수량 (들어올 수량에 넣지 않음)">'+(r.unordered>0?r.unordered.toLocaleString()+' 매':'-')+'</td>'
@@ -14565,7 +14678,7 @@ function invLotsHtml(r,longDays){
     r.lots.forEach(function(l,n){
       var st=l.remain<=0?'<span style="color:#9E9E9E">소진 완료</span>':(l.age>=longDays?'<span style="color:#4527A0;font-weight:700">🕒 장기재고</span>':(l.used>0?'<span style="color:#F57F17;font-weight:700">부분 출고</span>':'<span style="color:#1B5E20;font-weight:700">보유</span>'));
       h+='<tr style="background:'+(l.remain>0?'#fff':'#F5F5F5')+';color:'+(l.remain>0?'#333':'#9E9E9E')+'">'
-        +'<td style="padding:5px 8px">'+(n+1)+'</td><td style="padding:5px 8px">'+invEsc(l.date||'-')+'</td><td style="padding:5px 8px;font-family:monospace'+(l.isReturn?';color:#00695C':'')+'">'+invEsc(l.inNo||'-')+'</td>'
+        +'<td style="padding:5px 8px">'+(n+1)+'</td><td style="padding:5px 8px">'+invEsc(l.date||'-')+'</td><td style="padding:5px 8px;font-family:monospace'+((l.isReturn||l.isAdj)?';color:#00695C':'')+'">'+invEsc(l.inNo||'-')+'</td>'
         +'<td style="padding:5px 8px;font-size:10px">'+invEsc(l.poNum||'-')+(l.fromOrder?' / '+invEsc(l.fromOrder):'')+'</td>'
         +'<td style="padding:5px 8px;text-align:right">'+invEsc(l.qty.toLocaleString())+'</td><td style="padding:5px 8px;text-align:right">'+(l.used?invEsc(l.used.toLocaleString()):'-')+'</td>'
         +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+(l.remain>0?'#1B5E20':'#9E9E9E')+'">'+invEsc(l.remain.toLocaleString())+'</td>'
@@ -22100,7 +22213,7 @@ function _specFetchMissing(){
 // 전체 데이터 백업 / 복원
 // ══════════════════════════════════════
 // 변경이력(changelog)·휴지통(trash)도 함께 백업·복원 (예전엔 빠져 복원·기기 분실 때 사라졌음)
-var BACKUP_KEYS=['clients','orders','deliveries','master','devCosts','collections','stocks','closings','pos','quotes','returns','dests','paperPrices','settings','tools','invoices','trash','changelog'];
+var BACKUP_KEYS=['clients','orders','deliveries','master','devCosts','collections','stocks','closings','pos','quotes','returns','stockAdj','dests','paperPrices','settings','tools','invoices','trash','changelog'];
 var BACKUP_SECRET_KEYS=['kakao_worker_url','kakao_sync_secret','claude_api_key','tax_invoice_secret'];
 // ── 백업 객체 생성 (includeSpecs: 인쇄사양서 이미지 포함 여부 — 자동 스냅샷은 용량 때문에 제외)
 //    includeSecrets: 이 기기의 비밀키(API 키·시크릿) 포함 — 파일 백업에서 사용자가 '키 포함'을 고를 때만. 자동 스냅샷(기기·클라우드)에는 절대 넣지 않음
@@ -23475,7 +23588,7 @@ function _healthRulesR2(add,D,I){
   });
   R('empty_records',function(){
     var items=[];
-    ['orders','pos','stocks','deliveries','master','clients','dests','devCosts','quotes','collections','closings','returns','paperPrices','tools','invoices'].forEach(function(k){
+    ['orders','pos','stocks','deliveries','master','clients','dests','devCosts','quotes','collections','closings','returns','stockAdj','paperPrices','tools','invoices'].forEach(function(k){
       var a=loadData(k); if(!Array.isArray(a)) return;
       var n=a.filter(function(r){ return !_okRec(r); }).length; if(!n) return;
       items.push({label:(REC_LABELS[k]||k)+' '+n+'건 — 빈 기록(null·{})이거나 기록이 아닌 값',fix:{type:'dropEmpty',key:k,n:n}});
@@ -24471,7 +24584,7 @@ var HELP_TABS={
     m:['\'재단(날개포함)\'은 제품마스터·발주서와 같은 값입니다.','차량 적재 계산은 적재함 폭 2,350mm(5톤 장축 8.5M) 기준입니다. 실제 차량과 다르면 알려 주세요.'],
     b:[]},
   tab_order:{t:'📋 수주관리',d:'거래처에서 받은 주문(수주)을 넣습니다. 저장하면 발주관리에 "미발주" 줄이 생기고, 납기관리·홈 달력에 나옵니다.',
-    s:['[+ 수주 입력] → 거래처·품명·수량·납기일(납품처) → 저장.','저장하면 같은 거래처·날짜로 창이 다시 열려 다음 품목을 이어서 넣습니다. 다 넣었으면 [닫기].','창고 재고로 바로 납품하면 "📦 재고에서 출고(발주 안 함)"를 고르세요 — 발주·입고 줄을 만들지 않습니다.','늘 같은 품목을 주문하는 거래처는 수주 창의 [🔁 최근 수주]로 전에 주문한 품목·수량(단가)을 골라 채웁니다.','특가·견적 단가로 받은 수주는 창의 "💰 단가(이번 수주)" 칸에 넣으세요 — 출고 창에 그 단가가 미리 들어가고 그 출고는 그 단가로 고정됩니다(비우면 제품마스터 단가). 견적서의 [📋 수주로]가 견적 단가를 여기에 넣습니다.','PC 에서는 목록 머리글을 누르면 정렬, 우클릭으로 안 쓰는 열 숨기기, 머리글 끝을 끌어 열 폭(이 기기에 기억 — 다른 목록도 같음).'],
+    s:['[+ 수주 입력] → 거래처·품명·수량·납기일(납품처) → 저장.','저장하면 같은 거래처·날짜로 창이 다시 열려 다음 품목을 이어서 넣습니다. 다 넣었으면 [닫기].','창고 재고로 바로 납품하면 "📦 재고에서 출고(발주 안 함)"를 고르세요 — 발주·입고 줄을 만들지 않습니다.','늘 같은 품목을 주문하는 거래처는 수주 창의 [🔁 최근 수주]로 전에 주문한 품목·수량(단가)을 골라 채웁니다.','특가·견적 단가로 받은 수주는 창의 "💰 단가(이번 수주)" 칸에 넣으세요 — 출고 창에 그 단가가 미리 들어가고 그 출고는 그 단가로 고정됩니다(비우면 제품마스터 단가). 견적서의 [📋 수주로]가 견적 단가를 여기에 넣습니다.','PC 에서는 목록 머리글을 누르면 정렬, 우클릭으로 안 쓰는 열 숨기기, 머리글 끝을 끌어 열 폭(이 기기에 기억 — 다른 목록도 같음).','목록 위 상태 상자에서 "🚚 미완료"를 고르면 아직 나갈 수량이 남은 수주만 보입니다(끝난 수주는 "✅ 완료"). 고른 상태는 이 기기에 기억됩니다.'],
     m:['발주서를 낸 수주는 잠깁니다. 수량·품명을 바꾸려면 발주관리에서 [발주취소] 뒤 [수정], 납기일·납품처는 [📅 납기·납품처]로 언제든.','지운 수주는 🕘 이력 → 🗑 휴지통에서 되살릴 수 있습니다.'],
     b:[['+ 수주 입력','order']]},
   tab_po:{t:'🛒 발주관리',d:'수주로 생긴 "미발주" 줄을 발주처에 발주(발주서)합니다. 수주 없이 재고를 채우는 [＋ 재고용 발주]도 여기서.',
@@ -24480,7 +24593,7 @@ var HELP_TABS={
     b:[['＋ 재고용 발주','stockpo']]},
   tab_stock:{t:'📦 입고관리',d:'발주한 물건이 들어오면 입고처리합니다. 입고된 만큼 출고할 수 있습니다.',
     s:['미입고 줄의 [입고처리](여러 줄은 체크 → [입고]) → 입고일·수량 확인 → 확인.','들어온 수량이 다르면 그 수량을 넣으세요 (남은 수량은 미입고로 남음).'],
-    m:['수량을 잘못 넣었으면 [수량 수정] — 입고취소 후 다시 입고할 필요 없습니다.','덜 들어오고 끝났으면 [잔량 마감]. 이미 출고된 수주의 입고취소는 막힙니다(출고를 먼저 취소).'],
+    m:['수량·매입단가·입고일을 잘못 넣었으면 [수량 수정] — 입고취소 후 다시 입고할 필요 없습니다(마감한 달로는 못 옮김).','덜 들어오고 끝났으면 [잔량 마감]. 이미 출고된 수주의 입고취소는 막힙니다(출고를 먼저 취소). 일부라도 입고된 발주는 [발주취소]가 안 되니 입고취소 먼저.'],
     b:[['🛒 발주관리로','go_po']]},
   tab_delivery:{t:'🚚 납기관리',d:'납기 순으로 나갈 것을 보고 출고처리·거래명세표·현품표를 뽑습니다.',
     s:['줄의 🚚 (여러 품목은 체크 → [🚚 출고]) → 출고일·수량·단가·운반비 확인 → [🚚 출고처리].','출고가 끝나면 아래 초록 안내의 [🖨️ 거래명세표], 또는 줄의 🖨️ 로 명세표를 뽑습니다.','한 차에 여러 품목을 한 출고번호로 내려면 출고 창의 [📷 QR로 품목 더 담기] 또는 출고번호 고르기.'],
@@ -24515,8 +24628,8 @@ var HELP_TABS={
     m:['출고 전에 받은 돈은 청구연월에서 "청구 없음 · 선수금" 달을 고르세요.','청구연월을 잘못 넣었으면 수금 내역의 [✏️ 수정]에서 바꾸면 그 달로 옮겨집니다.'],
     b:[['+ 수금 입력','pay']]},
   tab_inventory:{t:'📦 재고시트',d:'품목별 현재고(선입선출)·입고 예정·미발주·수주잔량·안전재고 부족을 보여 줍니다.',
-    s:['"⚠️ 부족·발주 필요" 카드를 누르면 그 품목만 → 줄의 [📦 발주]로 재고용 발주.','안전재고 칸을 고치면 제품마스터에 저장됩니다.'],
-    m:['\'입고 예정\'은 발주서를 낸 수량만 셉니다 — 아직 발주 안 한 수주는 \'미발주\' 칸.','재고금액은 매입가 기준입니다(판매가 기준은 따로 표시).'],
+    s:['"⚠️ 부족·발주 필요" 카드를 누르면 그 품목만 → 줄의 [📦 발주]로 재고용 발주.','안전재고 칸을 고치면 제품마스터에 저장됩니다.','창고에서 세어 본 수량이 앱 재고와 다르면 줄의 [📐 조정] → 실제 수량을 넣으면 차이만큼 조정 기록이 생깁니다(재고 수량만 맞춤 — 매입원장·손익은 그대로). 조정 기록은 같은 창에서 지울 수 있고 휴지통에 남습니다.'],
+    m:['\'입고 예정\'은 발주서를 낸 수량만 셉니다 — 아직 발주 안 한 수주는 \'미발주\' 칸.','재고금액은 매입가 기준입니다(판매가 기준은 따로 표시).','실제로 들어온 물건이 빠진 거면 [📐 조정]이 아니라 입고관리에서 [입고처리]하세요(매입이 잡혀야 하므로).'],
     b:[['🛒 발주관리로','go_po']]},
   tab_quote:{t:'📄 견적서',d:'거래처에 보낼 견적서를 만들고 인쇄합니다.',
     s:['[+ 새 견적서] → 거래처·품목·견적기준·단가 → 저장 → 목록의 [🖨 인쇄] (인쇄 창의 [📄 PDF로 저장]도).','견적이 주문으로 이어지면 목록의 [📋 수주로] → 품목을 고르고 [▶ 수주 창에 채우기] (제품마스터에 없는 품목은 [📦 제품 등록] 먼저). 출고 때는 제품마스터 단가가 쓰이니 견적 단가와 다르면 제품마스터 단가를 맞춰 두세요.'],
@@ -24564,7 +24677,7 @@ var HELP_FIX=[
   {k:'relogin',t:'로그인 화면에 "로그인 유지 기한이 지나…" · "접속을 끊었습니다"가 떠요',s:['👥 팀 창의 "로그인 유지 기한"(기본 30일)이 지났거나 소유자·관리자가 그 기기의 [접속 끊기]를 누른 것입니다 — 그냥 다시 로그인하면 됩니다. 자료는 그대로이고 올라가지 않았던 변경도 이어서 올라갑니다.','기한이 번거로우면 소유자가 👥 팀 창에서 "없음"으로 바꿀 수 있습니다.'],b:[['👥 팀·로그인','team']]}
 ];
 // 이번 판에서 바뀐 점 (README ⑩ v2.5.0 간추림)
-var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.'];
+var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐 조정](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억).'];
 // 도움말 버튼이 부르는 동작 (버튼에는 키만 — 이름·자료는 넣지 않음)
 function _hCan(act){ try{ return typeof canDo==='function'?canDo(act)!==false:true; }catch(e){ return true; } }
 function _hNoEdit(){ try{ showInfoToast('🔒 보기 전용 권한이라 입력 창을 열 수 없습니다.','#B71C1C'); }catch(e){} }
@@ -26269,7 +26382,7 @@ var PERM_HIDE={
   admin:['executeClosing(','cancelClosing(','bulkCancelOrders(','bulkDeletePOs(','emptyTrash(','bulkDeletePayment(','bulkDeleteDetail(','triggerExcelUpload(','_excelUndo(','restoreLocalSnapshot(','restoreCloudSnapshot(','restore_file_input'],
   edit:['openOrderModal(','deleteOrder(','orderCloseRemain(','orderReopenRemain(','openOrderDueDestModal(',
     'printPO(','openPOModal(','cancelPO(','bulkCancelPOs(','deletePOLine(','openStockPOModal(','invOpenStockPO(','openPoLinkChooser(',
-    'completeStock(','completeStockBulk(','cancelStock(','bulkCancelStocks(','editStockQty(','addStockQty(','closeStockRemain(','reopenStockRemain(',
+    'completeStock(','completeStockBulk(','cancelStock(','bulkCancelStocks(','editStockQty(','addStockQty(','closeStockRemain(','reopenStockRemain(','invOpenAdj(','openStockAdjModal(',
     'deliveryOutOne(','deliveryOutBulk(','deliveryCancelOne(','bulkCancelDeliveries(','editDeliveryBulk(','openQrScanner(',
     'openMasterModal(','toggleMasterActive(','openMasterMove(','bulkCalcMasterDims(','copyMasterSelected(','cancelPriceReserve(',
     'openClientModal(','toggleClientActive(','applyDefaultTermsToAll(','deleteDestInline(','saveNewDest(',
@@ -27207,7 +27320,7 @@ function _healthMoreRules(add,D){
 // (WP-F · A7-13) 이름 칸 목록 — 앞뒤 공백 검진·[공백 지우기] 용. d: 그 기록의 날짜 칸(마감된 달 기록은 고치지 않음 — 없으면 기준 자료)
 var _NAME_FIELDS={clients:{f:['name','alias']},master:{f:['client','product','buy_vendor']},dests:{f:['name']},
   orders:{f:['client','product','dest','vendor'],d:'date'},pos:{f:['client','product','vendor','dest'],d:'issuedDate|date'},stocks:{f:['client','product'],d:'date'},deliveries:{f:['client','product'],d:'date'},
-  collections:{f:['client'],d:'yearMonth'},devCosts:{f:['client','product','supplier'],d:'date'},returns:{f:['client','product'],d:'date'},invoices:{f:['client'],d:'ym'},quotes:{f:['buyerName'],d:'date'},tools:{f:['client']}};
+  collections:{f:['client'],d:'yearMonth'},devCosts:{f:['client','product','supplier'],d:'date'},returns:{f:['client','product'],d:'date'},stockAdj:{f:['client','product']},invoices:{f:['client'],d:'ym'},quotes:{f:['buyerName'],d:'date'},tools:{f:['client']}};
 function _nameRecLocked(k,r){
   var spec=_NAME_FIELDS[k]; if(!spec||!spec.d) return false;
   var d=''; spec.d.split('|').some(function(f){ d=String(r[f]||''); return !!d; });
