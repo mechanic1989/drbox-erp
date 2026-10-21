@@ -3658,7 +3658,17 @@ if(fbReady){
         <input type="text" id="m_buy_vendor" list="m_buy_datalist" oninput="fillMasterBuyDatalist()" placeholder="발주처 선택" style="width:100%;padding:7px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px">
         <datalist id="m_buy_datalist"></datalist></div>
       <div><label style="font-size:10px;color:#666;font-weight:600;display:block;margin-bottom:3px" title="발주처에서 사 오는 완제품 1매의 값 — 매입원장·손익의 매입금액 = 이 값 × 수량(매)">매입단가 (원/매)</label>
-        <input type="number" id="m_buy_price" placeholder="0" style="width:100%;padding:7px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px"></div>
+        <input type="number" id="m_buy_price" placeholder="0" oninput="onMBuyPriceChange()" style="width:100%;padding:7px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px"></div>
+      <!-- 매입단가 변경 정보 (편집 시 매입단가가 바뀔 때 표시 — v2.5.1 매입단가 소급) -->
+      <div id="m_buy_change_box" class="cost-fld" style="grid-column:1/-1;background:#E3F2FD;border:1.5px solid #64B5F6;border-radius:8px;padding:10px;display:none">
+        <div style="font-size:11px;font-weight:700;color:#0D47A1;margin-bottom:8px">📅 매입단가 변경 — 언제부터 적용할까요?</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><label style="font-size:10px;color:#666;font-weight:600;display:block;margin-bottom:3px">적용 시작일</label>
+            <input type="date" id="m_buy_price_from" style="width:100%;padding:7px;border:1.5px solid #64B5F6;border-radius:6px;font-size:12px"></div>
+          <div id="m_buy_prev_info" style="font-size:11px;color:#37474F;background:#F5F5F5;padding:5px 8px;border-radius:5px;align-self:end"></div>
+        </div>
+        <div style="margin-top:7px;font-size:11px;color:#455A64;line-height:1.6">· 이 날짜 이후에 <b>이미 입고한 건</b>(열린 달)에도 새 매입단가를 적용할지 저장할 때 묻습니다. 적용하면 매입원장과 그 수주로 나간 출고의 원가(손익)가 함께 바뀝니다. 마감한 달의 입고는 그대로입니다.</div>
+      </div>
       <div><label style="font-size:10px;color:#666;font-weight:600;display:block;margin-bottom:3px">발주처 품목코드</label>
         <input type="text" id="m_buy_code" placeholder="발주처 품목코드" style="width:100%;padding:7px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px"></div>
       <div><label style="font-size:10px;color:#666;font-weight:600;display:block;margin-bottom:3px">안전재고 (매) <span style="font-weight:400;color:#999">· 미달 시 재고시트·홈에 경고</span></label>
@@ -13063,6 +13073,7 @@ function openMasterModal(idx=-1){
     ['m_jeonj','m_rp','m_nalgae','m_jeolsu','m_area'].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
     var _tiN=document.getElementById('m_tools_info'); if(_tiN) _tiN.innerHTML='<span style="color:#999">저장 후 🛠️ 목형·인쇄판 탭에서 이 제품에 자산을 연결할 수 있습니다.</span>';
     document.getElementById('m_flute').value='A골';
+    { var _bb0=document.getElementById('m_buy_change_box'); if(_bb0){ _bb0.style.display='none'; _bb0.dataset.origBuy='0'; } }
     (document.getElementById('m_pattern')||{}).innerHTML ='<option value="">선택</option>';
     { const _pq0=document.getElementById('m_pallet_qty'); if(_pq0) _pq0.dataset.stored=''; }
     document.getElementById('m_pallet_type').value='';
@@ -13104,6 +13115,7 @@ function openMasterModal(idx=-1){
     document.getElementById('m_buy_vendor').value=m.buy_vendor||'';
     document.getElementById('m_buy_code').value=m.buy_code||'';
     document.getElementById('m_buy_price').value=m.buy_price||'';
+    { var _bb=document.getElementById('m_buy_change_box'); if(_bb){ _bb.dataset.origBuy=String(+m.buy_price||0); _bb.style.display='none'; var _bf=document.getElementById('m_buy_price_from'); if(_bf) _bf.value=today(); } } // 매입단가 소급 (v2.5.1)
     document.getElementById('m_note').value=m.note||'';
     var _ssEl=document.getElementById('m_safety_stock'); if(_ssEl) _ssEl.value=(+m.safety_stock||0)>0?+m.safety_stock:'';
     var _tiE=document.getElementById('m_tools_info'); if(_tiE){ try{ _tiE.innerHTML=(typeof _masterToolsInfoHtml==='function')?_masterToolsInfoHtml(m):'-'; }catch(e){ _tiE.textContent='-'; } }
@@ -13150,6 +13162,18 @@ function openMasterModal(idx=-1){
 }
 
 // 단가 변경 감지 → 박스 토글
+// 매입단가 변경 상자 (v2.5.1): 기존 제품의 매입단가를 바꾸면 적용 시작일 칸을 보여 줌 — 저장할 때 그 날짜 이후 입고완료 건에도 적용할지 물음
+function onMBuyPriceChange(){
+  var box=document.getElementById('m_buy_change_box'); if(!box) return;
+  var idx=+document.getElementById('m_edit_idx').value;
+  if(idx<0){ box.style.display='none'; return; }
+  var nb=+document.getElementById('m_buy_price').value||0, ob=+(box.dataset.origBuy||0);
+  if(nb!==ob){
+    box.style.display='';
+    var diff=nb-ob, pct=ob?Math.round(diff/ob*1000)/10:0, sign=diff>0?'+':'';
+    var inf=document.getElementById('m_buy_prev_info'); if(inf) inf.innerHTML='이전 매입단가: <b>'+(ob?ob.toLocaleString()+'원':'없음')+'</b> → <b>'+(nb?nb.toLocaleString()+'원':'없음(0원)')+'</b>'+(ob&&nb?' &nbsp;|&nbsp; <b style="color:'+(diff>0?'#C62828':'#1565C0')+'">'+sign+diff.toLocaleString()+'원 ('+sign+pct+'%)</b>':'');
+  } else box.style.display='none';
+}
 function onMPriceChange(){
   var pcBox=document.getElementById('m_price_change_box'); if(!pcBox) return;
   var idx=+document.getElementById('m_edit_idx').value;
@@ -13255,6 +13279,35 @@ function _masterRenameApply(plan){
     if(n) saveData('tools',tools);
   }
 }
+// ── 매입단가 소급 (v2.5.1) ── 제품마스터 매입단가를 바꿀 때, 적용 시작일(m_buy_price_from) 이후 이미 입고한 건(입고완료 · 열린 달)의 매입단가도 바꿀지 묻고 바꿈
+//  · 매입원장·부가세 자료·그 수주 출고의 원가(손익)가 함께 바뀜 (마감한 달의 입고·마감 때 고정한 출고 원가는 그대로)
+//  · 매입단가 기록이 없던 입고(예전 판)는 [취소]해도 지금까지의 단가를 기록해 둠 — 제품마스터 단가를 바꿔도 지난 매입금액이 조용히 바뀌지 않게
+function _masterRebuyPlan(oldItem,data){
+  var ob=+oldItem.buy_price||0, nb=+data.buy_price||0; if(ob===nb) return null;
+  var from=((document.getElementById('m_buy_price_from')||{}).value)||today();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(from)) from=today();
+  var cands=[], closedN=0;
+  loadData('stocks').forEach(function(s){
+    if(!s||s.status!=='입고완료'||!(String(s.date||'')>=from)) return;
+    if(findMasterRec(s.client,s.product)!==oldItem) return;
+    var noRec=!_hasNum(s.buyUnitPrice), cur=noRec?buyUnitPriceOf(s):+s.buyUnitPrice;
+    if(cur===nb) return;
+    if(isMonthClosed(s.date)){ closedN++; return; }
+    cands.push({id:s._id,r:s,old:cur,noRec:noRec});
+  });
+  if(!cands.length){ if(closedN) try{ showInfoToast('🔒 마감된 달의 입고 '+closedN+'건은 마감 때 매입단가 그대로입니다.','#1F4E79'); }catch(e){} return null; }
+  var qty=cands.reduce(function(a,x){ return a+(+x.r.qty||0); },0), f=function(n){ return (+n||0).toLocaleString(); };
+  var ok=confirm('📦 '+(data.product||'')+' 매입단가를 '+from+'부터 '+f(nb)+'원으로 바꿉니다.\n\n이 날짜 이후 이미 입고한 '+cands.length+'건('+f(qty)+'매)은 입고할 때의 매입단가로 고정돼 있습니다.\n이 입고 '+cands.length+'건의 매입단가도 '+f(nb)+'원으로 바꿀까요?\n→ 매입원장·부가세 자료와 그 수주로 나간 출고의 원가(손익)가 함께 바뀝니다.'+(closedN?'\n(마감된 달의 입고 '+closedN+'건은 그대로)':'')+'\n\n[확인] 지난 입고도 새 단가로   [취소] 지난 입고는 그대로 — 새로 입고하는 것부터 새 단가');
+  return {list:cands,ok:ok,nb:nb,from:from};
+}
+function _masterRebuyApply(rb){
+  if(!rb||!rb.list||!rb.list.length) return;
+  var all=loadData('stocks'), byId={}, n=0, fz=0; all.forEach(function(s){ if(s&&s._id) byId[s._id]=s; });
+  rb.list.forEach(function(x){ var s=(x.id&&byId[x.id])||(all.indexOf(x.r)!==-1?x.r:null); if(!s||s.status!=='입고완료'||isMonthClosed(s.date)) return;
+    if(rb.ok){ if(rb.nb>0) s.buyUnitPrice=rb.nb; else delete s.buyUnitPrice; n++; }
+    else if(x.noRec&&x.old>0){ s.buyUnitPrice=x.old; fz++; } });
+  if(n||fz){ if(saveData('stocks',all)===false) return; try{ showInfoToast(n?'📦 이미 입고한 '+n+'건의 매입단가를 '+rb.nb.toLocaleString()+'원으로 바꿨습니다 (매입원장·손익 반영).':'📦 매입단가 기록이 없던 입고 '+fz+'건은 지금까지의 단가로 기록해 두었습니다 (금액 그대로).','#1565C0'); }catch(e){} }
+}
 function saveMaster(){
   const _rawIdx=+document.getElementById('m_edit_idx').value;
   const idx=resolveEditIdx('master',_rawIdx);
@@ -13314,7 +13367,7 @@ function saveMaster(){
   const master=loadData('master');
 
   // ── 단가 이력 처리 ──
-  var _rn=null, _rePrice=null, _mp=null, _mgM=null; // 품명 바꾸기 계획 · 이미 출고한 건의 단가 다시 정하기 계획 · 미발주 수주에 반영할 계획 (저장 뒤 반영) · 칸 합치기 결과
+  var _rn=null, _rePrice=null, _mp=null, _mgM=null, _rb=null; // 품명 바꾸기 계획 · 이미 출고한 건의 단가 다시 정하기 계획 · 미발주 수주에 반영할 계획 (저장 뒤 반영) · 칸 합치기 결과
   if(idx===-1){
     // 신규 등록: 첫 이력 생성
     if(data.price){
@@ -13377,6 +13430,8 @@ function saveMaster(){
       if(!confirm(_rn.msg)) return;
     }
     // 발주처·매입단가·원지·골·치수를 바꿨으면: 아직 발주하지 않은 이 제품의 수주·미발주 줄에도 반영할지 물음 (예전에는 받아 둔 수주에 옛 값이 남아 발주서에 옛 원지와 새 치수가 섞였음)
+    // 매입단가 소급 (v2.5.1): 적용 시작일 이후 이미 입고한 건(열린 달)의 매입단가도 바꿀지 — 판매단가 소급(F-01)과 같은 방식
+    _rb=_masterRebuyPlan(oldItem,data);
     _mp=_masterPendingPlan(oldItem,data);
     if(_mp) _mp.ok=confirm('📦 제품마스터의 '+_mp.labels.join('·')+'을(를) 바꿨습니다.\n\n아직 발주하지 않은 이 제품의 수주 '+_mp.orders.length+'건 · 미발주 줄 '+_mp.pos.length+'건에도 바뀐 값을 반영할까요?\n\n[확인] 반영 (발주서도 새 값으로)   [취소] 받아 둔 수주는 그대로 (발주관리 [수정]의 [↻ 제품마스터 값 불러오기]로 한 건씩 바꿀 수 있음)');
     master[idx]=Object.assign({},oldItem,data);
@@ -13399,6 +13454,7 @@ function saveMaster(){
   saveData('master',master);
   if(_rn) _masterRenameApply(_rn);
   if(_mp&&_mp.ok) _masterPendingApply(_mp,master[idx]);
+  if(_rb) _masterRebuyApply(_rb);
   _mergeEditNote(_mgM);
   if(_rePrice){
     // [확인] 새 단가로 · [취소] 단가 기록이 없던 출고만 지금까지의 단가로 기록 (나머지는 출고 때 단가 그대로) — 직접 넣은 단가는 후보에 없음
@@ -24607,7 +24663,7 @@ var HELP_TABS={
     b:[['📷 QR 출고','qr']]},
   tab_master:{t:'🏢 제품마스터',d:'거래처별 제품(품명·치수·원지·판매단가·발주처·매입단가·적재)을 등록합니다. 수주 창의 품명 목록이 여기서 나옵니다.',
     s:['왼쪽(폰은 위쪽)에서 거래처를 고르고 [+ 제품 등록] → 저장.','단가가 바뀌면 [수정](적용 시작일) 또는 [📅예약](앞으로 바뀔 단가). [📈이력]으로 지난 단가를 봅니다.','거래처에 보낼 단가표는 [📄 단가표] — 품명·규격·현재 단가·적용일·예정 단가가 한 장으로(인쇄·그림으로 저장).'],
-    m:['단가를 지난 날짜부터 바꾸면 이미 출고한 건도 바꿀지 묻습니다(마감한 달은 그대로).','품명을 바꾸면 지난 기록은 옛 품명 그대로 남습니다(확인창). 안 쓰는 제품은 지우지 말고 [사용 중지].'],
+    m:['단가를 지난 날짜부터 바꾸면 이미 출고한 건도 바꿀지 묻습니다(마감한 달은 그대로).','매입단가를 바꾸면 적용 시작일을 묻고, 그 날짜 이후 이미 입고한 건의 매입단가도 바꿀지 묻습니다 — 바꾸면 매입원장과 그 수주로 나간 출고의 원가(손익)가 함께 바뀝니다(마감한 달은 그대로). 발주처 단가가 소급 인상·인하될 때 쓰세요.','품명을 바꾸면 지난 기록은 옛 품명 그대로 남습니다(확인창). 안 쓰는 제품은 지우지 말고 [사용 중지].'],
     b:[['+ 제품 등록','master_new']]},
   tab_client:{t:'🏬 거래처등록',d:'파는 곳(매출처)과 사는 곳(발주처)을 등록합니다 — 상호·사업자번호·결제조건·여신 한도·세금계산서 발행 대상·납품처.',
     s:['[+ 거래처 등록] → 업체명·구분(매출/매입)·사업자번호·결제조건 → 저장.','관리상호(짧은 이름)를 넣으면 수주 창 목록에 짧게 나옵니다.'],
@@ -24683,7 +24739,7 @@ var HELP_FIX=[
   {k:'relogin',t:'로그인 화면에 "로그인 유지 기한이 지나…" · "접속을 끊었습니다"가 떠요',s:['👥 팀 창의 "로그인 유지 기한"(기본 30일)이 지났거나 소유자·관리자가 그 기기의 [접속 끊기]를 누른 것입니다 — 그냥 다시 로그인하면 됩니다. 자료는 그대로이고 올라가지 않았던 변경도 이어서 올라갑니다.','기한이 번거로우면 소유자가 👥 팀 창에서 "없음"으로 바꿀 수 있습니다.'],b:[['👥 팀·로그인','team']]}
 ];
 // 이번 판에서 바뀐 점 (README ⑩ v2.5.0 간추림)
-var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐 조정](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억).'];
+var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억) · 제품마스터 매입단가를 바꿀 때 이미 입고한 건(열린 달)에도 소급할지 묻기.'];
 // 도움말 버튼이 부르는 동작 (버튼에는 키만 — 이름·자료는 넣지 않음)
 function _hCan(act){ try{ return typeof canDo==='function'?canDo(act)!==false:true; }catch(e){ return true; } }
 function _hNoEdit(){ try{ showInfoToast('🔒 보기 전용 권한이라 입력 창을 열 수 없습니다.','#B71C1C'); }catch(e){} }
