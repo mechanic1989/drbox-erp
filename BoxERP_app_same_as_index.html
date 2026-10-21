@@ -11509,6 +11509,7 @@ function bulkCancelStocks(){
   if(!checked.length){alert('취소할 입고를 먼저 체크해주세요.');return;}
   const stocks=loadData('stocks');
   const picked=[]; checked.forEach(function(c){ const s=stocks[+c.dataset.idx]; if(s&&picked.indexOf(s)===-1) picked.push(s); });
+  const I0=getIdx();
   let lockedIn=0; const blocked=[];
   let targets=picked.filter(function(s){
     if(!s||s.status!=='입고완료') return false;
@@ -11520,8 +11521,13 @@ function bulkCancelStocks(){
   Object.keys(grp).forEach(function(k){ const L=grp[k], q=L.reduce(function(a,s){ return a+(+s.qty||0); },0); if(_stockCancelCheck(L[0],q).block) L.forEach(function(s){ blocked.push(s); }); });
   targets=targets.filter(function(s){ return blocked.indexOf(s)===-1; });
   const skipped=picked.length-targets.length-lockedIn-blocked.length;
-  const exNote=(skipped?'\n※ 미입고 '+skipped+'건은 제외됨':'')+(lockedIn?'\n※ 마감된 달 '+lockedIn+'건은 제외됨':'')+(blocked.length?'\n※ 이미 출고된 수주의 입고 '+blocked.length+'건은 제외됨 ('+blocked.map(function(s){ return s.product; }).slice(0,4).join(', ')+') — 먼저 출고취소를 하거나 [수량 수정]을 쓰세요':'');
-  if(!targets.length){alert((lockedIn&&!blocked.length&&!skipped)?'🔒 마감된 달의 입고는 취소할 수 없습니다.':'취소 가능한 항목(입고완료 상태)이 없습니다.'+exNote);return;}
+  // 안내를 또렷하게 (v2.5.1): 미입고 줄을 체크한 경우 · 이미 출고된 수주의 입고 — 각각 어디서 무엇을 해야 하는지
+  const miPicked=picked.filter(function(s){ return s&&s.status!=='입고완료'; });
+  const miNote=skipped?('\n※ 미입고 '+skipped+'건은 제외됨 — 미입고 줄은 "아직 안 들어온 수량"이라 입고취소 대상이 아닙니다.'
+      +(miPicked.some(function(s){ return s.fromOrder&&I0.get(I0.stocksByOrder,s.fromOrder).some(function(x){ return x&&x!==s&&x.status==='입고완료'; }); })?' 일부 입고한 건을 취소하려면 같은 수주의 「입고완료」 줄(입고번호 IN-…)을 체크하세요.':'')
+      +' 더 안 받을 수량이면 그 줄의 [잔량 마감].'):'';
+  const exNote=miNote+(lockedIn?'\n※ 마감된 달 '+lockedIn+'건은 제외됨':'')+(blocked.length?'\n※ 이미 출고된 수주의 입고 '+blocked.length+'건은 제외됨 ('+blocked.map(function(s){ return s.product; }).slice(0,4).join(', ')+') — 들어온 수량이 벌써 나가서 취소하면 그 출고를 댈 재고가 없습니다. 납기관리에서 그 출고를 먼저 [↩ 출고취소]하거나, 입고 수량만 틀린 거면 [수량 수정]을 쓰세요':'');
+  if(!targets.length){alert((lockedIn&&!blocked.length&&!skipped)?'🔒 마감된 달의 입고는 취소할 수 없습니다.':((blocked.length&&!skipped)?'🚫 입고취소 불가':'취소 가능한 항목(입고완료 상태)이 없습니다.')+exNote);return;}
   const lines=targets.map(function(s){return '- '+(s.client||'')+' '+s.product+' ('+(+s.qty||0).toLocaleString()+'매)';}).join('\n');
   if(!confirm(targets.length+'건 입고를 취소합니다.\n미입고로 되돌아갑니다.\n\n'+lines+(exNote?'\n'+exNote:'')+ '\n\n계속하시겠습니까?')) return;
   const I=getIdx();
