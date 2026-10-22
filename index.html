@@ -1979,7 +1979,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.5.1</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.5.3</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -2066,6 +2066,8 @@ if(fbReady){
     </div>
     <div id="dash_pl_body" style="padding:14px"></div>
   </div>
+  <!-- 자금 흐름 (v2.5.3) -->
+  <div id="dash_cash" class="dash-section cost-sec" style="margin-bottom:14px;display:none"></div>
   <!-- 목표 달성 진행바 -->
   <div id="dash_goal_bar"></div>
   <!-- KPI 카드 -->
@@ -2980,6 +2982,14 @@ if(fbReady){
       <div style="font-size:9px;opacity:0.8;margin-bottom:3px">순이익</div>
       <div id="profit_net" style="font-size:18px;font-weight:700">0원</div>
     </div>
+    <div id="profit_fixed_card" style="display:none;background:#BF360C;color:#fff;border-radius:8px;padding:10px 16px;min-width:160px;text-align:center">
+      <div style="font-size:9px;opacity:0.8;margin-bottom:3px" title="월세·차량·보험 등 월 고정비 — 이번 달은 지난 날수만큼 일할">고정비 (일할)</div>
+      <div id="profit_fixed" style="font-size:18px;font-weight:700">0원</div>
+    </div>
+    <div id="profit_op_card" style="display:none;background:#1B5E20;color:#fff;border-radius:8px;padding:10px 16px;min-width:160px;text-align:center">
+      <div style="font-size:9px;opacity:0.8;margin-bottom:3px" title="순이익 − 고정비">영업이익 (고정비 뒤)</div>
+      <div id="profit_op" style="font-size:18px;font-weight:700">0원</div>
+    </div>
     <div style="background:#558B2F;color:#fff;border-radius:8px;padding:10px 16px;min-width:130px;text-align:center">
       <div style="font-size:9px;opacity:0.8;margin-bottom:3px">운반비전 이익률</div>
       <div id="profit_gross_rate" style="font-size:22px;font-weight:700">0%</div>
@@ -3001,6 +3011,14 @@ if(fbReady){
       </div>
       <div id="profit_goal_display" style="flex:1;min-width:200px"></div>
     </div>
+  </div>
+  <!-- 월 고정비 (v2.5.3) -->
+  <div id="profit_fixed_section" class="cost-sec" style="background:#fff;border-radius:8px;padding:12px 16px;margin-bottom:10px;border:1px solid #C5CAE9">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <span style="font-size:12px;font-weight:700;color:#1A237E">🏠 월 고정비 <span id="fc_sum" style="font-weight:400;color:#555;font-size:11px"></span></span>
+      <button type="button" id="fc_toggle" onclick="fcToggle()" style="padding:5px 12px;background:#fff;color:#1A237E;border:1px solid #C5CAE9;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">입력</button>
+    </div>
+    <div id="fc_body" style="display:none"></div>
   </div>
 
   <!-- 차트 섹션 -->
@@ -3239,7 +3257,7 @@ if(fbReady){
         <span id="ar_default_terms_wrap" style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:400;flex-wrap:wrap">
           <span>기본 결제조건</span>
           <select id="ar_default_terms" onchange="setDefaultPaymentTerms(this.value)" style="padding:4px 8px;border:1px solid rgba(255,255,255,0.5);border-radius:5px;font-size:11px;background:#fff;color:#333">
-            <option value="">(없음 → 청구월 말일)</option><option value="마감후10일">마감후 10일</option><option value="마감후15일">마감후 15일</option><option value="마감후말일">마감후 말일</option><option value="마감후60일">마감후 60일</option>
+            <option value="">(없음 → 청구월 말일)</option><option value="마감후10일">마감후 10일</option><option value="마감후15일">마감후 15일</option><option value="마감후말일">마감후 말일</option><option value="마감후30일">마감후 30일</option><option value="마감후40일">마감후 40일</option><option value="마감후45일">마감후 45일</option><option value="마감후60일">마감후 60일</option>
           </select>
           <button id="ar_apply_terms_btn" onclick="applyDefaultTermsToAll()" style="padding:4px 10px;background:#fff;color:#B71C1C;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">미설정 거래처에 적용</button>
         </span>
@@ -3659,6 +3677,7 @@ if(fbReady){
         <datalist id="m_buy_datalist"></datalist></div>
       <div><label style="font-size:10px;color:#666;font-weight:600;display:block;margin-bottom:3px" title="발주처에서 사 오는 완제품 1매의 값 — 매입원장·손익의 매입금액 = 이 값 × 수량(매)">매입단가 (원/매)</label>
         <input type="number" id="m_buy_price" placeholder="0" oninput="onMBuyPriceChange()" style="width:100%;padding:7px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px"></div>
+      <div id="m_margin_hint" class="cost-fld" style="grid-column:1/-1;font-size:11px;line-height:1.5;margin-top:-4px"></div>
       <!-- 매입단가 변경 정보 (편집 시 매입단가가 바뀔 때 표시 — v2.5.1 매입단가 소급) -->
       <div id="m_buy_change_box" class="cost-fld" style="grid-column:1/-1;background:#E3F2FD;border:1.5px solid #64B5F6;border-radius:8px;padding:10px;display:none">
         <div style="font-size:11px;font-weight:700;color:#0D47A1;margin-bottom:8px">📅 매입단가 변경 — 언제부터 적용할까요?</div>
@@ -3894,6 +3913,9 @@ if(fbReady){
               <option value="마감후10일">마감후 10일</option>
               <option value="마감후15일">마감후 15일</option>
               <option value="마감후말일">마감후 말일</option>
+              <option value="마감후30일">마감후 30일</option>
+              <option value="마감후40일">마감후 40일</option>
+              <option value="마감후45일">마감후 45일</option>
               <option value="마감후60일">마감후 60일</option>
             </select>
           </div>
@@ -6281,7 +6303,88 @@ function devCostSalesDate(dc){ if(!dc) return ''; if(dc.salesOnRegDate) return S
 // ══════════════════════════════════════
 function getSettings(){ var s=loadData('settings'); return (s&&typeof s==='object'&&!Array.isArray(s))?s:{}; }
 function saveSettings(patch){ var s=Object.assign({},getSettings(),patch||{}); saveData('settings',s); return s; }
-var PAYMENT_TERMS_OPTIONS=['마감후10일','마감후15일','마감후말일','마감후60일'];
+// ── 월 고정비 (v2.5.3) ── settings.fixed_costs = [{from:'YYYY-MM', items:[{n:'월세',a:2300000},…]}] — 적용 시작월별 묶음, 그 달 이후에는 가장 최근 묶음이 적용
+//  · 손익(홈·손익분석·차트·목표)의 영업이익 = 순이익(매출총이익 − 운반비 − 당사 부담 개발비) − 고정비(일할). 거래처별 조회에는 넣지 않음(회사 전체 비용)
+//  · 매입원장·마감 대조·부가세 자료와는 무관 (매입이 아니라 경비)
+var FIXED_COST_PRESETS=['월세','차량 할부','연료','보험','통신·전기','기장료','기타'];
+function _fixedCostList(){
+  var s=getSettings().fixed_costs; if(!Array.isArray(s)) return [];
+  return s.filter(function(e){ return e&&/^\d{4}-\d{2}$/.test(String(e.from||''))&&Array.isArray(e.items); })
+    .map(function(e){ return {from:String(e.from),items:e.items.filter(function(it){ return it&&String(it.n||'').trim()&&(+it.a||0)>0; }).map(function(it){ return {n:String(it.n).trim().slice(0,30),a:Math.round(+it.a)}; })}; })
+    .sort(function(a,b){ return a.from<b.from?-1:(a.from>b.from?1:0); });
+}
+function _fixedCostEntryFor(ym){ var hit=null; _fixedCostList().forEach(function(e){ if(e.from<=ym) hit=e; }); return hit; }
+function _fixedMonthlyFor(ym){ var e=_fixedCostEntryFor(ym); return e?e.items.reduce(function(a,it){ return a+it.a; },0):0; }
+// 기간의 고정비 — 달마다 (기간 안의 날수 ÷ 그 달 일수) × 그 달 월 고정비. 아직 오지 않은 날은 빼고(오늘까지), 기간이 없으면 0
+function _fixedCostFor(fromStr,toStr){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(fromStr||'')||!/^\d{4}-\d{2}-\d{2}$/.test(toStr||'')) return 0;
+  var td=today(), to=toStr<td?toStr:td; if(to<fromStr) return 0;
+  var total=0, ym=fromStr.slice(0,7), end=to.slice(0,7), guard=0;
+  while(ym<=end&&guard++<600){
+    var mo=_fixedMonthlyFor(ym);
+    if(mo>0){
+      var y=+ym.slice(0,4), m=+ym.slice(5,7), dim=new Date(y,m,0).getDate();
+      var a=ym+'-01', b=ym+'-'+('0'+dim).slice(-2);
+      var s0=fromStr>a?fromStr:a, e0=to<b?to:b;
+      var days=Math.round((parseYmd(e0)-parseYmd(s0))/86400000)+1;
+      if(days>0) total+=mo*days/dim;
+    }
+    ym=addMonths(ym,1);
+  }
+  return Math.round(total);
+}
+function _fixedCostForMonth(ym){ if(!/^\d{4}-\d{2}$/.test(ym||'')) return 0; var y=+ym.slice(0,4), m=+ym.slice(5,7); return _fixedCostFor(ym+'-01',ym+'-'+('0'+new Date(y,m,0).getDate()).slice(-2)); }
+// 손익분석 "🏠 월 고정비" 상자
+var _fcEditing=false;
+function fcToggle(){ _fcEditing=!_fcEditing; renderFixedCostBox(); }
+function _fcRowHtml(n,a){ var esc=_ddEsc; return '<div class="fc-row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px;flex-wrap:wrap"><input class="fc-n" value="'+esc(n)+'" placeholder="항목 (예: 월세)" style="flex:1 1 120px;min-width:100px;padding:6px;border:1px solid #C5CAE9;border-radius:5px;font-size:12px"><input class="fc-a" type="number" min="0" step="1" inputmode="numeric" value="'+(a>0?a:'')+'" placeholder="월 금액(원)" style="flex:1 1 120px;min-width:110px;padding:6px;border:1px solid #C5CAE9;border-radius:5px;font-size:12px;text-align:right"><button type="button" onclick="this.parentNode.remove()" title="이 항목 빼기" style="padding:6px 9px;background:#fff;color:#B71C1C;border:1px solid #EF9A9A;border-radius:5px;font-size:11px;cursor:pointer">✕</button></div>'; }
+function fcAddRow(){ var h=document.getElementById('fc_rows'); if(h) h.insertAdjacentHTML('beforeend',_fcRowHtml('',0)); }
+function renderFixedCostBox(){
+  var box=document.getElementById('profit_fixed_section'); if(!box) return;
+  var canEdit=(typeof canDo!=='function')||canDo('edit');
+  var ym=today().slice(0,7), cur=_fixedCostEntryFor(ym), list=_fixedCostList(), esc=_ddEsc;
+  var sumEl=document.getElementById('fc_sum'), body=document.getElementById('fc_body'), btn=document.getElementById('fc_toggle');
+  if(sumEl) sumEl.textContent=cur?'— 월 '+_fixedMonthlyFor(ym).toLocaleString()+'원 ('+cur.items.map(function(it){ return it.n+' '+it.a.toLocaleString(); }).join(' · ')+' · '+cur.from.replace('-','년 ')+'월부터)':'— 아직 없음';
+  if(btn){ btn.style.display=canEdit?'':'none'; btn.textContent=_fcEditing?'닫기':(cur?'수정':'입력'); }
+  if(!body) return;
+  if(!_fcEditing||!canEdit){ body.style.display='none'; body.innerHTML=''; return; }
+  var seed=cur?cur.items:FIXED_COST_PRESETS.map(function(n){ return {n:n,a:0}; });
+  body.style.display='';
+  body.innerHTML='<div style="font-size:11px;color:#555;line-height:1.6;margin-bottom:8px">월세·차량 할부·연료·보험처럼 <b>매달 거의 같은 경비</b>를 넣으면 홈·손익분석의 영업이익이 이 비용까지 뺀 값으로 보입니다(이번 달은 지난 날수만큼 일할). 금액은 공급가 기준, 매입(박스값)은 넣지 않습니다. 비워 둔 항목은 저장되지 않습니다.</div>'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap"><label style="font-size:11px;font-weight:700;color:#1A237E">적용 시작월</label><input type="month" id="fc_from" value="'+esc(cur?cur.from:ym)+'" style="padding:5px 8px;border:1px solid #C5CAE9;border-radius:5px;font-size:12px"><span style="font-size:10px;color:#888">금액이 바뀌는 달(예: 할부가 끝나는 달)부터 새로 저장하면 그 전 달은 예전 금액으로 남습니다</span></div>'
+    +'<div id="fc_rows">'+seed.map(function(it){ return _fcRowHtml(it.n,it.a); }).join('')+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button type="button" onclick="fcAddRow()" style="padding:6px 12px;background:#fff;color:#1A237E;border:1px solid #C5CAE9;border-radius:5px;font-size:11px;cursor:pointer">+ 항목</button><button type="button" onclick="saveFixedCosts()" style="padding:6px 14px;background:#1A237E;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">저장</button>'+(cur?'<button type="button" onclick="deleteFixedCostEntry()" style="padding:6px 12px;background:#fff;color:#B71C1C;border:1px solid #EF9A9A;border-radius:5px;font-size:11px;cursor:pointer">이 묶음 지우기</button>':'')+'</div>'
+    +(list.length>1?'<div style="font-size:10px;color:#888;margin-top:8px">저장된 묶음: '+list.map(function(e){ return esc(e.from.replace('-','.'))+'~ '+e.items.reduce(function(a,it){ return a+it.a; },0).toLocaleString()+'원'; }).join(' · ')+'</div>':'');
+}
+function saveFixedCosts(){
+  if(typeof canDo==='function'&&!canDo('edit')) return;
+  var from=((document.getElementById('fc_from')||{}).value||'').slice(0,7);
+  if(!/^\d{4}-\d{2}$/.test(from)){ alert('적용 시작월을 고르세요 (예: 2026-10).'); return; }
+  var items=[], bad=null;
+  Array.prototype.forEach.call(document.querySelectorAll('#fc_rows .fc-row'),function(r){
+    var n=String((r.querySelector('.fc-n')||{}).value||'').trim(), av=String((r.querySelector('.fc-a')||{}).value||'').trim();
+    if(!n&&!av) return; if(!n){ bad='금액만 있고 항목 이름이 없는 줄이 있습니다.'; return; }
+    var a=Math.round(+av||0); if(av&&!(isFinite(+av)&&a>=0)){ bad='"'+n+'" 금액이 숫자가 아닙니다.'; return; }
+    if(a>0) items.push({n:n.slice(0,30),a:a});
+  });
+  if(bad){ alert(bad); return; }
+  var list=_fixedCostList().filter(function(e){ return e.from!==from; });
+  if(items.length) list.push({from:from,items:items});
+  list.sort(function(a,b){ return a.from<b.from?-1:(a.from>b.from?1:0); });
+  saveSettings({fixed_costs:list});
+  _fcEditing=false;
+  try{ showInfoToast(items.length?'🏠 월 고정비 '+items.reduce(function(a,it){ return a+it.a; },0).toLocaleString()+'원 저장 ('+from.replace('-','년 ')+'월부터) — 영업이익에 반영됩니다.':'🏠 '+from.replace('-','년 ')+'월부터의 고정비 묶음을 지웠습니다.','#2E7D32'); }catch(e){}
+  try{ renderProfit(); }catch(e){}
+  try{ var home=document.getElementById('tab_home'); if(home&&home.style.display!=='none'&&typeof renderDashboard==='function') renderDashboard(); }catch(e){}
+}
+function deleteFixedCostEntry(){
+  var from=((document.getElementById('fc_from')||{}).value||'').slice(0,7);
+  var list=_fixedCostList(); if(!list.some(function(e){ return e.from===from; })){ alert('그 시작월의 묶음이 없습니다.'); return; }
+  if(!confirm(from.replace('-','년 ')+'월부터의 고정비 묶음을 지울까요? (그 전 묶음이 있으면 그 금액이 이어집니다)')) return;
+  saveSettings({fixed_costs:list.filter(function(e){ return e.from!==from; })});
+  _fcEditing=false; try{ renderProfit(); }catch(e){} try{ var home=document.getElementById('tab_home'); if(home&&home.style.display!=='none'&&typeof renderDashboard==='function') renderDashboard(); }catch(e){}
+}
+var PAYMENT_TERMS_OPTIONS=['마감후10일','마감후15일','마감후말일','마감후30일','마감후40일','마감후45일','마감후60일']; // v2.5.2: 30·40·45일 추가 (마감후N일은 calcDueDate 가 N을 읽어 계산)
 function getDefaultPaymentTerms(){ var v=getSettings().default_payment_terms||''; return PAYMENT_TERMS_OPTIONS.indexOf(v)!==-1?v:''; }
 // 거래처의 유효 결제조건: 거래처 설정 → 기본값 → '' ; src: 'client'|'default'|''
 function effectivePaymentTerms(client){
@@ -11099,6 +11202,8 @@ function saveOrder(){
   renderAll();
   // 처리 결과 안내 (A8-13) — 연속 입력으로 창이 곧바로 빈 칸으로 다시 열려도 저장된 것을 알 수 있게
   try{ doneToast('수주 '+data.num+(idx===-1?' 저장됨':' 수정됨')+' — '+data.client+' · '+data.product+' '+(+data.qty||0).toLocaleString()+'매'+(stockShip?' (재고에서 출고)':'')); }catch(e){}
+  // 마진 경고 (v2.5.3): 5% 이하면 빨간 안내 (저장은 됨)
+  try{ var _mi=_oMarginInfo(data.client,data.product,+data.unitPrice||0,data.date); if(_mi&&_mi.low&&(typeof canSee!=='function'||canSee('cost'))) showInfoToast('⚠️ 마진 '+_mi.pct+'% — '+MARGIN_WARN_PCT+'% 이하 수주입니다: '+data.product+' 판매 '+Math.round(_mi.sale).toLocaleString()+'원 · 매입 '+Math.round(_mi.buy).toLocaleString()+'원 (매당 '+Math.round(_mi.m).toLocaleString()+'원)','#C62828',{ms:10000}); }catch(e){}
   _mergeEditNote(_mg);
   if(idx===-1){
     // 신규 저장 후 연속 입력: 모달 다시 열기 — 수주일자·거래처·납기일은 방금 입력한 값 그대로 (같은 거래처 품목을 이어서 넣기 쉽게)
@@ -13073,7 +13178,7 @@ function openMasterModal(idx=-1){
     ['m_jeonj','m_rp','m_nalgae','m_jeolsu','m_area'].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
     var _tiN=document.getElementById('m_tools_info'); if(_tiN) _tiN.innerHTML='<span style="color:#999">저장 후 🛠️ 목형·인쇄판 탭에서 이 제품에 자산을 연결할 수 있습니다.</span>';
     document.getElementById('m_flute').value='A골';
-    { var _bb0=document.getElementById('m_buy_change_box'); if(_bb0){ _bb0.style.display='none'; _bb0.dataset.origBuy='0'; } }
+    { var _bb0=document.getElementById('m_buy_change_box'); if(_bb0){ _bb0.style.display='none'; _bb0.dataset.origBuy='0'; } try{ _mMarginHint(); }catch(e){} }
     (document.getElementById('m_pattern')||{}).innerHTML ='<option value="">선택</option>';
     { const _pq0=document.getElementById('m_pallet_qty'); if(_pq0) _pq0.dataset.stored=''; }
     document.getElementById('m_pallet_type').value='';
@@ -13115,7 +13220,7 @@ function openMasterModal(idx=-1){
     document.getElementById('m_buy_vendor').value=m.buy_vendor||'';
     document.getElementById('m_buy_code').value=m.buy_code||'';
     document.getElementById('m_buy_price').value=m.buy_price||'';
-    { var _bb=document.getElementById('m_buy_change_box'); if(_bb){ _bb.dataset.origBuy=String(+m.buy_price||0); _bb.style.display='none'; var _bf=document.getElementById('m_buy_price_from'); if(_bf) _bf.value=today(); } } // 매입단가 소급 (v2.5.1)
+    { var _bb=document.getElementById('m_buy_change_box'); if(_bb){ _bb.dataset.origBuy=String(+m.buy_price||0); _bb.style.display='none'; var _bf=document.getElementById('m_buy_price_from'); if(_bf) _bf.value=today(); } try{ _mMarginHint(); }catch(e){} } // 매입단가 소급 (v2.5.1)
     document.getElementById('m_note').value=m.note||'';
     var _ssEl=document.getElementById('m_safety_stock'); if(_ssEl) _ssEl.value=(+m.safety_stock||0)>0?+m.safety_stock:'';
     var _tiE=document.getElementById('m_tools_info'); if(_tiE){ try{ _tiE.innerHTML=(typeof _masterToolsInfoHtml==='function')?_masterToolsInfoHtml(m):'-'; }catch(e){ _tiE.textContent='-'; } }
@@ -13164,6 +13269,7 @@ function openMasterModal(idx=-1){
 // 단가 변경 감지 → 박스 토글
 // 매입단가 변경 상자 (v2.5.1): 기존 제품의 매입단가를 바꾸면 적용 시작일 칸을 보여 줌 — 저장할 때 그 날짜 이후 입고완료 건에도 적용할지 물음
 function onMBuyPriceChange(){
+  try{ _mMarginHint(); }catch(e){} // 마진 안내 (v2.5.3)
   var box=document.getElementById('m_buy_change_box'); if(!box) return;
   var idx=+document.getElementById('m_edit_idx').value;
   if(idx<0){ box.style.display='none'; return; }
@@ -13175,6 +13281,7 @@ function onMBuyPriceChange(){
   } else box.style.display='none';
 }
 function onMPriceChange(){
+  try{ _mMarginHint(); }catch(e){} // 마진 안내 (v2.5.3)
   var pcBox=document.getElementById('m_price_change_box'); if(!pcBox) return;
   var idx=+document.getElementById('m_edit_idx').value;
   if(idx<0){ pcBox.style.display='none'; return; }
@@ -16523,6 +16630,9 @@ function _plCompute(fromStr,toStr,clientFilter){
   t.gross=t.sales-t.cost; t.net=t.gross-t.freight-t.extra;
   t.grossRate=t.sales>0?Math.round(t.gross/t.sales*1000)/10:0;
   t.netRate=t.sales>0?Math.round(t.net/t.sales*1000)/10:0;
+  // 월 고정비(일할) → 영업이익 (v2.5.3) — 거래처별 조회에는 넣지 않음 (회사 전체 비용) · 고정비가 없으면 영업이익 = 순이익
+  t.fixed=clientFilter?0:_fixedCostFor(fromStr,toStr);
+  t.op=t.net-t.fixed; t.opRate=t.sales>0?Math.round(t.op/t.sales*1000)/10:0;
   return {rows:rows,tot:t};
 }
 // 손익 줄의 품명 칸 글
@@ -16536,8 +16646,9 @@ function _goalInfo(){
   var goal=+(store.getItem('monthly_profit_goal')||0); if(!(goal>0)) return null;
   var ym=today().slice(0,7), y=+ym.slice(0,4), m=+ym.slice(5,7);
   var pl=calcPL(ym+'-01',ym+'-'+('0'+new Date(y,m,0).getDate()).slice(-2));
-  var pct=Math.round(pl.net/goal*100);
-  return {goal:goal,net:pl.net,pct:pct,fill:Math.max(0,Math.min(100,pct)),color:pct>=100?'#2E7D32':pct>=70?'#F57F17':'#C62828',ym:ym};
+  var _n=(pl.op!==undefined?pl.op:pl.net); // 고정비를 넣었으면 고정비 뒤 영업이익으로 (v2.5.3)
+  var pct=Math.round(_n/goal*100);
+  return {goal:goal,net:_n,pct:pct,fill:Math.max(0,Math.min(100,pct)),color:pct>=100?'#2E7D32':pct>=70?'#F57F17':'#C62828',ym:ym};
 }
 
 function renderProfit(){
@@ -16575,6 +16686,14 @@ function renderProfit(){
   document.getElementById('profit_rate').textContent=totalNetRate+'%';
   var netCard=document.getElementById('profit_net_card');
   if(netCard) netCard.style.background=totalNet>=0?'#2E7D32':'#B71C1C';
+  // 고정비·영업이익 카드 (v2.5.3) — 고정비를 넣었고 전체 조회일 때만 (거래처별 조회는 회사 비용을 나누지 않음)
+  (function(){
+    var fc=document.getElementById('profit_fixed_card'), oc=document.getElementById('profit_op_card'); if(!fc||!oc) return;
+    var show=!clientFilter&&T.fixed>0;
+    fc.style.display=show?'':'none'; oc.style.display=show?'':'none';
+    if(show){ document.getElementById('profit_fixed').textContent=T.fixed.toLocaleString()+'원'; document.getElementById('profit_op').textContent=T.op.toLocaleString()+'원 ('+T.opRate+'%)'; oc.style.background=T.op>=0?'#1B5E20':'#B71C1C'; }
+    try{ renderFixedCostBox(); }catch(e){}
+  })();
 
   // ── 목표 달성 진행바 — 늘 '이번 달 순이익 ÷ 월 목표' (위 기간·거래처와 상관없음 — 홈·브리핑과 같은 값) ──
   (function(){
@@ -16647,7 +16766,7 @@ function renderProfit(){
     var MP=_plByMonth(months[0]+'-01',last+'-'+('0'+lastDay).slice(-2));
     var labels=months.map(function(m){return m.slice(5)+'월';});
     var salesVals=months.map(function(m){return Math.round(((MP[m]||{}).sales||0)/10000);});
-    var netVals=months.map(function(m){return Math.round(((MP[m]||{}).net||0)/10000);});
+    var netVals=months.map(function(m){ var r=MP[m]||{}; return Math.round(((r.op!==undefined?r.op:r.net)||0)/10000); }); // 고정비를 넣었으면 영업이익(고정비 뒤) (v2.5.3)
     if(window._profitChartTrend){ try{window._profitChartTrend.destroy();}catch(e){} }
     window._profitChartTrend=new Chart(canvas.getContext('2d'),{
       type:'line',
@@ -16655,7 +16774,7 @@ function renderProfit(){
         labels:labels,
         datasets:[
           {label:'매출(만원)',data:salesVals,borderColor:'rgba(30,136,229,0.7)',backgroundColor:'rgba(30,136,229,0.08)',fill:true,tension:0.35,pointRadius:3,borderWidth:1.5},
-          {label:'순이익(만원)',data:netVals,borderColor:'rgba(46,125,50,0.9)',backgroundColor:'rgba(46,125,50,0.08)',fill:true,tension:0.35,pointRadius:3,borderWidth:2}
+          {label:(T.fixed>0?'영업이익(고정비 뒤·만원)':'순이익(만원)'),data:netVals,borderColor:'rgba(46,125,50,0.9)',backgroundColor:'rgba(46,125,50,0.08)',fill:true,tension:0.35,pointRadius:3,borderWidth:2}
         ]
       },
       options:{
@@ -16745,7 +16864,8 @@ function renderProfit(){
 
   } else {
     // 월별 보기 — 같은 줄(개발비·반품 포함)을 달마다 더함 → 월 줄의 합 = 합계 줄
-    var mRows=_plMonthRows(itemRows);
+    var _wf=!clientFilter&&T.fixed>0; // 고정비 열 (v2.5.3)
+    var mRows=_plMonthRows(itemRows,_wf);
 
     thead.innerHTML='<tr>'
       +'<th style="'+BH+';'+TH+';text-align:left;width:110px">연월</th>'
@@ -16758,10 +16878,11 @@ function renderProfit(){
       +'<th style="'+BH+';'+TH+';text-align:right;width:65px;color:#A5D6A7">이익률</th>'
       +'<th style="'+BH+';'+TH+';text-align:right;width:110px;color:#80DEEA">순이익</th>'
       +'<th style="'+BH+';'+TH+';text-align:right;width:65px;color:#80DEEA">순이익률</th>'
+      +(_wf?'<th style="'+BH+';'+TH+';text-align:right;width:100px;color:#FFCC80" title="월 고정비(월세·차량 등) — 이번 달은 지난 날수만큼 일할">고정비</th><th style="'+BH+';'+TH+';text-align:right;width:110px;color:#FFE082" title="순이익 − 고정비">영업이익</th>':'')
       +'</tr>';
 
     if(mRows.length===0){
-      tbody.innerHTML='<tr><td colspan="10" style="padding:20px;text-align:center;color:#888">출고내역이 없습니다.</td></tr>';
+      tbody.innerHTML='<tr><td colspan="'+(_wf?12:10)+'" style="padding:20px;text-align:center;color:#888">출고내역이 없습니다.</td></tr>';
       tfoot.innerHTML=''; return;
     }
 
@@ -16782,6 +16903,7 @@ function renderProfit(){
         +'<td style="padding:7px 6px;border-bottom:1px solid #E8EAF6;text-align:right;font-weight:700;color:'+(r.grossRate>=0?'#2E7D32':'#C62828')+'">'+r.grossRate+'%</td>'
         +'<td style="padding:7px 6px;border-bottom:1px solid #E8EAF6;text-align:right;font-weight:700;color:'+netColor+'">'+r.net.toLocaleString()+'원</td>'
         +'<td style="padding:7px 6px;border-bottom:1px solid #E8EAF6;text-align:right;font-weight:700;color:'+(r.netRate>=0?'#1565C0':'#C62828')+'">'+r.netRate+'%</td>'
+        +(_wf?'<td style="padding:7px 6px;border-bottom:1px solid #E8EAF6;text-align:right;color:#E65100">'+r.fixed.toLocaleString()+'원</td><td style="padding:7px 6px;border-bottom:1px solid #E8EAF6;text-align:right;font-weight:700;color:'+(r.op>=0?'#1B5E20':'#B71C1C')+'">'+r.op.toLocaleString()+'원 <span style="font-weight:400;font-size:10px;color:#888">('+r.opRate+'%)</span></td>':'')
         +'</tr>';
     });
     tbody.innerHTML=mHtml;
@@ -16795,11 +16917,12 @@ function renderProfit(){
       +'<td style="padding:8px 6px;text-align:right">'+totalGrossRate+'%</td>'
       +'<td style="padding:8px 6px;text-align:right">'+sgn(totalNet)+'원</td>'
       +'<td style="padding:8px 6px;text-align:right">'+totalNetRate+'%</td>'
+      +(_wf?'<td style="padding:8px 6px;text-align:right">'+T.fixed.toLocaleString()+'원</td><td style="padding:8px 6px;text-align:right">'+sgn(T.op)+'원 ('+T.opRate+'%)</td>':'')
       +'</tr>';
   }
 }
 // 손익 줄 → 달마다 합 (월별 보기·엑셀)
-function _plMonthRows(rows){
+function _plMonthRows(rows,withFixed){
   var monthMap={}, order=[];
   rows.forEach(function(r){
     var ym=String(r.date||'').substring(0,7);
@@ -16808,11 +16931,12 @@ function _plMonthRows(rows){
     m.sales+=r.sales; m.cost+=r.cost; m.freight+=r.freight; m.extra+=r.extra; m.gross+=r.gross; m.net+=r.net;
   });
   order.sort();
-  return order.map(function(ym){ var m=monthMap[ym]; m.grossRate=m.sales>0?Math.round(m.gross/m.sales*1000)/10:0; m.netRate=m.sales>0?Math.round(m.net/m.sales*1000)/10:0; return m; });
+  return order.map(function(ym){ var m=monthMap[ym]; m.grossRate=m.sales>0?Math.round(m.gross/m.sales*1000)/10:0; m.netRate=m.sales>0?Math.round(m.net/m.sales*1000)/10:0;
+    m.fixed=withFixed?_fixedCostForMonth(ym):0; m.op=m.net-m.fixed; m.opRate=m.sales>0?Math.round(m.op/m.sales*1000)/10:0; return m; }); // 고정비(일할)·영업이익 (v2.5.3 — 전체 조회만)
 }
 // 여러 달을 한 번에 계산해 달마다 나눔 (홈 12개월 차트·손익분석 6개월 차트) → {YYYY-MM: {sales,cost,net,netRate,...}}
 function _plByMonth(fromStr,toStr){
-  var out={}; _plMonthRows(_plCompute(fromStr,toStr,'').rows).forEach(function(m){ out[m.ym]=m; }); return out;
+  var out={}; _plMonthRows(_plCompute(fromStr,toStr,'').rows,true).forEach(function(m){ out[m.ym]=m; }); return out;
 }
 
 function totalQty_m(mRows){ return mRows.reduce(function(s,r){return s+r.qty;},0); }
@@ -16826,8 +16950,9 @@ function exportProfitExcel(){
   var KL={item:'출고',dev:'개발비',ret:'반품·가감'};
   var csvRows;
   if(profitView==='month'){
-    csvRows=[['연월','출고건수','총수량','매출합계','매입원가','운반비·기타','운반비전이익','이익률','순이익','순이익률']];
-    _plMonthRows(P.rows).forEach(function(m){ csvRows.push([m.ym,m.cnt,m.qty,m.sales,m.cost,m.freight+m.extra,m.gross,m.grossRate+'%',m.net,m.netRate+'%']); });
+    var _wf=!clientFilter&&T.fixed>0;
+    csvRows=[['연월','출고건수','총수량','매출합계','매입원가','운반비·기타','운반비전이익','이익률','순이익','순이익률'].concat(_wf?['고정비(일할)','영업이익','영업이익률']:[])];
+    _plMonthRows(P.rows,_wf).forEach(function(m){ csvRows.push([m.ym,m.cnt,m.qty,m.sales,m.cost,m.freight+m.extra,m.gross,m.grossRate+'%',m.net,m.netRate+'%'].concat(_wf?[m.fixed,m.op,m.opRate+'%']:[])); });
   } else {
     csvRows=[['출고일','출고번호','거래처','품명','수량','매출액','매입원가','운반비·기타','운반비전이익','이익률','순이익','순이익률','구분']];
     P.rows.forEach(function(r){ csvRows.push([r.date,r.outNo||'',r.client,_plRowLabel(r),r.kind==='item'?r.qty:'',r.sales,r.cost,r.freight+r.extra,r.gross,r.sales>0?r.grossRate+'%':'',r.net,r.sales>0?r.netRate+'%':'',KL[r.kind]||'']); });
@@ -17105,21 +17230,15 @@ function calcDueDate(yearMonth, paymentTerms){
   var y=+yearMonth.substring(0,4), m=+yearMonth.substring(5,7);
   // 해당 월 말일
   var lastDay=new Date(y,m,0); // JS: month 0-based, day=0 → 전월 말일
-  if(paymentTerms==='마감후10일'){
-    var d=new Date(lastDay); d.setDate(d.getDate()+10);
-    return fmtLocalDate(d);
-  } else if(paymentTerms==='마감후15일'){
-    var d=new Date(lastDay); d.setDate(d.getDate()+15);
-    return fmtLocalDate(d);
-  } else if(paymentTerms==='마감후말일'){
+  if(paymentTerms==='마감후말일'){
     // 다음달 말일
     var nm=m+1>12?1:m+1, ny=m+1>12?y+1:y;
     var nld=new Date(ny,nm,0);
     return fmtLocalDate(nld);
-  } else if(paymentTerms==='마감후60일'){
-    var d=new Date(lastDay); d.setDate(d.getDate()+60);
-    return fmtLocalDate(d);
   }
+  // 마감후N일 (10·15·30·40·45·60 — v2.5.2 부터 N 을 읽어 계산: 그 달 말일 + N일)
+  var mt=String(paymentTerms).match(/^마감후(\d{1,3})일$/);
+  if(mt){ var d=new Date(lastDay); d.setDate(d.getDate()+(+mt[1])); return fmtLocalDate(d); }
   return '';
 }
 
@@ -19158,6 +19277,25 @@ document.addEventListener('DOMContentLoaded',function(){ try{ _kInitButtons(); }
 //  _hdrSyncBadge() — 머리줄 "📴 오프라인 · 안 올라간 변경 n건" 갱신 (PHASE_F 2절 약속 · 없으면 아무것도 안 함)
 // ══════════════════════════════════════════════════════════════════════
 // ── S-O3 수주 창 "단가 (이번 수주)" 칸 ──
+// ── 마진 경고 (v2.5.3) ── (판매단가 − 매입단가) ÷ 판매단가 가 MARGIN_WARN_PCT 이하면 빨간 안내 — 막지는 않음 (초도·샘플처럼 일부러 낮게 받는 경우가 있음)
+//  · 수주 창: 이 수주의 단가(비우면 제품마스터 지금 단가) vs 제품마스터 매입단가 · 저장 뒤 빨간 토스트 · 제품마스터 창: 판매단가·매입단가 칸 아래
+//  · 원가를 가린 역할(canSee('cost') 아님)에게는 보이지 않음 (.cost-fld)
+var MARGIN_WARN_PCT=5;
+function _marginInfo(sale,buy){ sale=+sale||0; buy=+buy||0; if(!(sale>0)||!(buy>0)) return null; var m=sale-buy, pct=Math.round(m/sale*1000)/10; return {sale:sale,buy:buy,m:m,pct:pct,low:pct<=MARGIN_WARN_PCT}; }
+function _marginHtml(mi){ if(!mi) return ''; var f=function(n){ return Math.round(n).toLocaleString(); }; return mi.low?'<span class="cost-fld" style="color:#C62828;font-weight:700">⚠️ 마진 '+f(mi.m)+'원 ('+mi.pct+'%) — '+MARGIN_WARN_PCT+'% 이하 (판매 '+f(mi.sale)+' · 매입 '+f(mi.buy)+')</span>':'<span class="cost-fld" style="color:#2E7D32">마진 '+f(mi.m)+'원 ('+mi.pct+'%)</span>'; }
+function _oMarginInfo(client,product,unitPrice,date){
+  client=client||((document.getElementById('o_client')||{}).value||''); product=product||((document.getElementById('o_product')||{}).value||'');
+  if(!product) return null;
+  var up=unitPrice!==undefined?(+unitPrice||0):(+((document.getElementById('o_unit_price')||{}).value)||0);
+  var sale=up>0?up:0; if(!sale){ try{ sale=saleUnitPrice({client:client,product:product,date:date||today()}); }catch(e){ sale=0; } }
+  var m=null; try{ m=findMasterRec(client,product); }catch(e){}
+  return _marginInfo(sale,m?+(m.buy_price||0):0);
+}
+function _mMarginHint(){
+  var el=document.getElementById('m_margin_hint'); if(!el) return;
+  var mi=_marginInfo((document.getElementById('m_price')||{}).value,(document.getElementById('m_buy_price')||{}).value);
+  el.innerHTML=mi?_marginHtml(mi):'';
+}
 function _oUnitPriceHint(){
   var el=document.getElementById('o_unit_price_hint'); if(!el) return;
   var client=(document.getElementById('o_client')||{}).value||'', product=(document.getElementById('o_product')||{}).value||'';
@@ -19166,6 +19304,7 @@ function _oUnitPriceHint(){
   var cur=0; try{ cur=saleUnitPrice({client:client,product:product,date:today()}); }catch(e){}
   var s='제품마스터 지금 단가 <b>'+_kWon(cur)+'</b>원 — 비우면 출고 때 그날의 제품마스터 단가, 넣으면 <b>이 수주의 출고 단가</b>가 됩니다(특가·견적 단가 · 제품마스터 단가를 바꿔도 그대로).';
   if(up>0&&cur>0&&up!==cur) s+=' <span style="color:#E65100;font-weight:700">이번 수주 '+_kWon(up)+'원 ('+(up>cur?'+':'')+_kWon(up-cur)+')</span>';
+  try{ var _mi=_oMarginInfo(client,product); if(_mi&&(typeof canSee!=='function'||canSee('cost'))) s+=' · '+_marginHtml(_mi); }catch(e){} // 마진 경고 (v2.5.3)
   el.innerHTML=s;
 }
 function _oInitOrderPrice(){
@@ -23747,7 +23886,7 @@ function buildDailyBriefing(){
     lines.push('🧯 재고 부족·발주 필요 '+invShort.length+'건'+(invShort.length?': '+invShort.slice(0,3).map(function(r){ return r.client+' '+r.product+' '+r.shortQty.toLocaleString()+'매('+r.alert+')'; }).join(' / ')+(invShort.length>3?' 외 '+(invShort.length-3)+'건':''):'')
       +(invLong.length?' · 🕒 장기재고 '+invLong.length+'건 ('+invLong.slice(0,2).map(function(r){ return r.product+' '+r.oldestAge+'일'; }).join(', ')+')':''));
   }
-  if(pl) lines.push('📈 이번달 매출 '+won(pl.sales)+(_seeCost?' · 영업이익 '+won(pl.net)+' ('+pl.netRate+'%)':'')+(goalPct!==null?' · 목표 달성 '+goalPct+'%':''));
+  if(pl) lines.push('📈 이번달 매출 '+won(pl.sales)+(_seeCost?' · 영업이익 '+won(pl.op!==undefined?pl.op:pl.net)+' ('+(pl.opRate!==undefined?pl.opRate:pl.netRate)+'%)':'')+(goalPct!==null?' · 목표 달성 '+goalPct+'%':''));
   var alerts=dueToday.length+overdue.length+latePOs.length+(ar&&ar.buckets[4]>0?1:0)+invShort.length;
   return {date:td,dow:dow,lines:lines,text:lines.join('\n'),seeCost:_seeCost,dueToday:dueToday,dueSoon:dueSoon,overdue:overdue,pendingPOs:pendingPOs,latePOs:latePOs,unissuedPO:unPO.n,yShip:yShip,yQty:yQty,yAmt:yAmt,ar:ar,dueWeek:dueWeek,dueWeekList:dueWeekList,pl:pl,goalPct:goalPct,alerts:alerts,invShort:invShort,invLong:invLong};
 }
@@ -23765,7 +23904,7 @@ function renderDailyBriefing(){
     tile('💰 7일 내 수금 예정',b.ar?won(b.dueWeek):'-',b.ar?('연체 '+won(b.ar.overdue)+(b.ar.buckets[4]>0?' · 90일↑ '+won(b.ar.buckets[4]):'')):'',b.ar&&b.ar.overdue>0?'#C62828':'#1565C0'),
     tile('📦 어제 출고',b.yShip.length+'건 · '+b.yQty.toLocaleString()+'매',won(b.yAmt),'#00695C'),
     tile('🧯 재고 부족',(b.invShort||[]).length+'건',(b.invShort||[]).length?esc(b.invShort.slice(0,2).map(function(r){ return r.product+' '+r.shortQty.toLocaleString()+'매'; }).join(', ')):((b.invLong||[]).length?'장기재고 '+b.invLong.length+'건':'충족'),(b.invShort||[]).length?'#C62828':((b.invLong||[]).length?'#F57F17':'#2E7D32')),
-    tile('📈 이번달'+(b.seeCost===false?' 매출':''),b.pl?won(b.pl.sales):'-',b.pl&&b.seeCost!==false?('영업이익 '+won(b.pl.net)+' ('+b.pl.netRate+'%)'+(b.goalPct!==null?' · 목표 '+b.goalPct+'%':'')):'','#1F4E79') // WP-L: 가린 역할은 매출만
+    tile('📈 이번달'+(b.seeCost===false?' 매출':''),b.pl?won(b.pl.sales):'-',b.pl&&b.seeCost!==false?('영업이익 '+won(b.pl.op!==undefined?b.pl.op:b.pl.net)+' ('+(b.pl.opRate!==undefined?b.pl.opRate:b.pl.netRate)+'%)'+(b.goalPct!==null?' · 목표 '+b.goalPct+'%':'')):'','#1F4E79') // WP-L: 가린 역할은 매출만
   ].join('');
   el.innerHTML='<div class="dash-section-hdr" style="background:#F9A825;color:#3E2723;justify-content:space-between;cursor:pointer" onclick="toggleBriefing(event)">'
     +'<span>☀️ 오늘의 브리핑 <span style="font-weight:400;font-size:11px;opacity:0.8">'+b.date+'('+b.dow+')'+(b.alerts?' · 확인 필요 '+b.alerts+'건':' · 특이사항 없음')+'</span></span>'
@@ -23847,7 +23986,7 @@ function scheduleBriefingPopup(delayMs){ clearTimeout(window._briefT); window._b
 // ── 기간 손익 계산 — 손익분석 탭과 같은 함수(_plCompute)의 합계 (개발비·반품·매출 가감 포함, 운반비는 합계가 정확히 맞게 나눔) ──
 function calcPL(fromStr,toStr,clientFilter){
   var t=_plCompute(fromStr,toStr,clientFilter).tot;
-  return {sales:t.sales,cost:t.cost,freight:t.freight,extra:t.extra,devMargin:t.devMargin,devCount:t.devCount,devSales:t.devSales,retCount:t.retCount,retSales:t.retSales,cnt:t.cnt,qty:t.qty,byClient:t.byClient,gross:t.gross,net:t.net,grossRate:t.grossRate,netRate:t.netRate};
+  return {sales:t.sales,cost:t.cost,freight:t.freight,extra:t.extra,devMargin:t.devMargin,devCount:t.devCount,devSales:t.devSales,retCount:t.retCount,retSales:t.retSales,cnt:t.cnt,qty:t.qty,byClient:t.byClient,gross:t.gross,net:t.net,grossRate:t.grossRate,netRate:t.netRate,fixed:t.fixed||0,op:t.op!==undefined?t.op:t.net,opRate:t.opRate!==undefined?t.opRate:t.netRate};
 }
 function setDashPeriod(p){ window._dashPeriod=p; renderDashboard(); }
 function _plDelta(cur,prev){
@@ -23888,6 +24027,52 @@ function _monthPOAmount(ym){
 // 날짜를 n개월 옮김 (그 달에 없는 날은 말일로) — 홈 '전월 대비'를 같은 기간끼리 비교할 때
 function _shiftYmd(ymd,n){ var d=parseYmd(ymd), y=d.getFullYear(), m=d.getMonth()+n, last=new Date(y,m+1,0).getDate(); return fmtLocalDate(new Date(y,m,Math.min(d.getDate(),last))); }
 
+// ── 자금 흐름 (v2.5.3) ── 홈 카드: 이달·다음달·그 뒤의 받을 돈(수금 예정 — 수금관리와 같은 계산: 청구 공급가+부가세 − 수금, 거래처 결제조건) ·
+//  줄 돈(매입 결제 예정 — 입고완료 매입 × 1.1, 매입 결제조건 settings.purchase_terms, 기본 마감후말일) · 고정비(🏠 월 고정비) · 차이
+//  · 매입 지급 기록은 없으므로 결제일이 지난달 이전인 매입은 지급한 것으로 봄 · 연체(받을 날 지난 미수)는 "지금 받을 돈"으로 이달에 넣음
+//  · 원가를 가린 역할에게는 카드가 보이지 않음(.cost-sec)
+function getPurchaseTerms(){ var v=getSettings().purchase_terms||''; return PAYMENT_TERMS_OPTIONS.indexOf(v)!==-1?v:'마감후말일'; }
+function setPurchaseTerms(v){ if(typeof canDo==='function'&&!canDo('edit')){ try{ showInfoToast('🔒 편집 권한이 없어 바꿀 수 없습니다.','#B71C1C'); }catch(e){} return; } saveSettings({purchase_terms:(PAYMENT_TERMS_OPTIONS.indexOf(v)!==-1?v:'')}); try{ renderCashFlowCard(); }catch(e){} }
+function _cashFlowCalc(){
+  var td=today(), ym=td.slice(0,7), nym=addMonths(ym,1);
+  var r={today:td,ym:ym,nym:nym,inn:{cur:0,next:0,later:0,over:0,overN:0},out:{cur:0,next:0,later:0},outSrc:{cur:[],next:[],later:[]},fixed:{cur:_fixedMonthlyFor(ym),next:_fixedMonthlyFor(nym)},terms:getPurchaseTerms(),noCollections:false,noTerms:0,hasAr:false};
+  var ar=null; try{ ar=calcArAging(td); }catch(e){ console.warn('cash ar',e); }
+  if(ar){ r.hasAr=true; Object.keys(ar.clients).forEach(function(cn){ ar.clients[cn].items.forEach(function(it){ var dm=String(it.due||'').slice(0,7); if(it.days>0){ r.inn.over+=it.remain; r.inn.overN++; } else if(dm===ym) r.inn.cur+=it.remain; else if(dm===nym) r.inn.next+=it.remain; else r.inn.later+=it.remain; }); }); r.noTerms=(ar.noTermsClients||[]).length; }
+  try{ r.noCollections=!loadData('collections').some(function(c){ return c&&Array.isArray(c.payments)&&c.payments.some(function(p){ return p&&(+p.amount||0)>0; }); }); }catch(e){}
+  var pur={}; loadData('stocks').forEach(function(s){ if(!s||s.status!=='입고완료') return; var m=String(s.date||'').slice(0,7); if(!/^\d{4}-\d{2}$/.test(m)) return; pur[m]=(pur[m]||0)+Math.round((+s.qty||0)*buyUnitPriceOf(s)); });
+  Object.keys(pur).sort().forEach(function(m){ var due=calcDueDate(m,r.terms)||''; var dm=due.slice(0,7); if(!dm||dm<ym) return; var amt=Math.round(pur[m]*1.1); var k=dm===ym?'cur':(dm===nym?'next':'later'); r.out[k]+=amt; r.outSrc[k].push({ym:m,due:due,amt:amt}); });
+  r.net={cur:r.inn.cur+r.inn.over-r.out.cur-r.fixed.cur,next:r.inn.next-r.out.next-r.fixed.next};
+  return r;
+}
+function renderCashFlowCard(){
+  var box=document.getElementById('dash_cash'); if(!box) return;
+  if(typeof canSee==='function'&&!canSee('cost')){ box.style.display='none'; return; }
+  var r; try{ r=_cashFlowCalc(); }catch(e){ console.warn('cash flow',e); box.style.display='none'; return; }
+  var any=r.inn.cur||r.inn.next||r.inn.later||r.inn.over||r.out.cur||r.out.next||r.out.later||r.fixed.cur;
+  if(!any){ box.style.display='none'; return; }
+  var esc=_ddEsc, man=function(n){ n=Math.round(n); if(!n) return '-'; return (n<0?'−':'')+Math.abs(Math.round(n/10000)).toLocaleString()+'만'; };
+  var mon=function(ym){ return (+ym.slice(5,7))+'월'; };
+  var canEdit=(typeof canDo!=='function')||canDo('edit');
+  var cell=function(v,color,bold){ return '<div style="text-align:right;font-weight:'+(bold?'800':'600')+';color:'+(color||'#333')+';white-space:nowrap">'+v+'</div>'; };
+  var row=function(label,a,b,c,colors,bold){ return '<div style="display:grid;grid-template-columns:minmax(90px,1.4fr) 1fr 1fr 1fr;gap:6px;padding:7px 0;border-bottom:1px solid #F0F0F0;font-size:12px;align-items:center"><div style="color:#444">'+label+'</div>'+cell(a,colors[0],bold)+cell(b,colors[1],bold)+cell(c,colors[2],bold)+'</div>'; };
+  var srcTxt=function(k){ return r.outSrc[k].length?' <span style="font-size:10px;color:#888">('+r.outSrc[k].map(function(x){ return mon(x.ym)+' 입고분'; }).join('·')+')</span>':''; };
+  var h='<div class="dash-section-hdr" style="justify-content:space-between"><span>💵 자금 흐름 <span style="font-weight:400;opacity:0.8;font-size:11px;margin-left:6px">(전산에 있는 청구·입고 기준 · 부가세 포함)</span></span>'
+    +'<span style="font-size:11px;font-weight:400;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>매입 결제조건</span>'
+    +(canEdit?'<select onchange="setPurchaseTerms(this.value)" style="padding:3px 6px;border:1px solid rgba(255,255,255,0.5);border-radius:5px;font-size:11px;background:#fff;color:#333">'+PAYMENT_TERMS_OPTIONS.map(function(o){ return '<option value="'+esc(o)+'"'+(o===r.terms?' selected':'')+'>'+esc(o.replace('마감후','마감후 '))+'</option>'; }).join('')+'</select>':'<b>'+esc(r.terms)+'</b>')+'</span></div>'
+    +'<div style="padding:10px 16px 12px">'
+    +'<div style="display:grid;grid-template-columns:minmax(90px,1.4fr) 1fr 1fr 1fr;gap:6px;padding:4px 0 6px;border-bottom:2px solid #E0E6EF;font-size:11px;font-weight:700;color:#1F4E79"><div></div><div style="text-align:right">이달 ('+mon(r.ym)+')</div><div style="text-align:right">다음달 ('+mon(r.nym)+')</div><div style="text-align:right">그 뒤</div></div>'
+    +row('받을 돈 (수금 예정)'+(r.inn.over>0?' <span style="font-size:10px;color:#C62828">연체 '+man(r.inn.over)+' 포함</span>':''),man(r.inn.cur+r.inn.over),man(r.inn.next),man(r.inn.later),['#1565C0','#1565C0','#1565C0'])
+    +row('줄 돈 (매입 결제)'+srcTxt('cur')+srcTxt('next'),man(r.out.cur),man(r.out.next),man(r.out.later),['#E65100','#E65100','#E65100'])
+    +row('고정비 (월세·차량 등)',man(r.fixed.cur),man(r.fixed.next),'<span style="color:#aaa">-</span>',['#795548','#795548','#795548'])
+    +row('<b>차이 (받을 돈 − 줄 돈 − 고정비)</b>',man(r.net.cur),man(r.net.next),'<span style="color:#aaa">-</span>',[r.net.cur>=0?'#2E7D32':'#C62828',r.net.next>=0?'#2E7D32':'#C62828','#aaa'],true)
+    +'<div style="font-size:10px;color:#888;margin-top:8px;line-height:1.6">'
+    +'받을 돈은 수금관리와 같은 계산(청구 − 수금, 거래처 결제조건)이고, 줄 돈은 입고완료 매입 × 1.1 을 매입 결제조건으로 나눈 것입니다. 지난달 이전에 결제일이 온 매입은 지급한 것으로 봅니다.'
+    +(r.noCollections?' <b style="color:#C62828">아직 수금 입력이 없어 받을 돈이 실제보다 크게 보입니다 — 입금 때 💰 수금관리에 넣으세요.</b>':'')
+    +(r.fixed.cur?'':' 고정비는 손익분석 🏠 월 고정비에 넣으면 여기에도 들어옵니다.')
+    +(r.noTerms?' 결제조건이 없는 거래처 '+r.noTerms+'곳은 청구월 말일 기준.':'')
+    +'</div></div>';
+  box.innerHTML=h; box.style.display='';
+}
 function renderDashboard(){
   var now=new Date();
   var today=fmtLocalDate(now);
@@ -23940,8 +24125,9 @@ function renderDashboard(){
       {cls:'sales',l:'매출액',v:_fmtWon(pl.sales),s:_plDelta(pl.sales,plPrev.sales)+'<span>'+prevLabel+' '+_fmtWon(plPrev.sales)+'</span>'},
       {cls:'cost',l:'매출원가 (출고분)',v:_fmtWon(pl.cost),s:_plDelta(pl.cost,plPrev.cost)+'<span>원가율 '+costRate+'%</span>'},
       {cls:'gross',l:'매출총이익',v:_fmtWon(pl.gross),s:_plDelta(pl.gross,plPrev.gross)+'<span>총이익률 '+pl.grossRate+'%</span>'},
-      {cls:'',l:'운반비 + 당사 부담 개발비',v:_fmtWon(pl.freight+pl.extra),s:'<span>운반비 '+_fmtWon(pl.freight)+' · 개발비 '+_fmtWon(pl.extra)+'</span>'},
-      {cls:'net'+(pl.net<0?' neg':''),l:'영업이익 (순이익)',v:_fmtWon(pl.net),s:_plDelta(pl.net,plPrev.net)+'<span>영업이익률 '+pl.netRate+'% · '+prevLabel+' '+plPrev.netRate+'%</span>'}
+      (pl.fixed>0?{cls:'',l:'운반비 + 개발비 + 고정비(일할)',v:_fmtWon(pl.freight+pl.extra+pl.fixed),s:'<span>운반비 '+_fmtWon(pl.freight)+' · 개발비 '+_fmtWon(pl.extra)+' · 고정비 '+_fmtWon(pl.fixed)+'</span>'}
+                 :{cls:'',l:'운반비 + 당사 부담 개발비',v:_fmtWon(pl.freight+pl.extra),s:'<span>운반비 '+_fmtWon(pl.freight)+' · 개발비 '+_fmtWon(pl.extra)+'</span>'}),
+      {cls:'net'+(pl.op<0?' neg':''),l:'영업이익'+(pl.fixed>0?' (고정비 뒤)':' (순이익)'),v:_fmtWon(pl.op),s:_plDelta(pl.op,plPrev.op)+'<span>영업이익률 '+pl.opRate+'% · '+prevLabel+' '+plPrev.opRate+'%</span>'}
     ];
     var h='<div class="pl-grid">'+tiles.map(function(t){
       return '<div class="pl-tile '+t.cls+'"><div class="pl-l">'+t.l+'</div><div class="pl-v">'+t.v+'</div><div class="pl-s">'+t.s+'</div></div>';
@@ -23954,13 +24140,16 @@ function renderDashboard(){
       +'<div><div class="fl-l">= 매출총이익</div><div class="fl-v" style="color:#00695C">'+_fmtWon(pl.gross)+' <span style="font-weight:400;color:#888">('+pl.grossRate+'%)</span></div><div class="pl-bar"><div style="width:'+pct(pl.gross)+'%;background:#00897B"></div></div></div>'
       +'<div><div class="fl-l">− 운반비</div><div class="fl-v">'+_fmtWon(pl.freight)+'</div><div class="pl-bar"><div style="width:'+pct(pl.freight)+'%;background:#90A4AE"></div></div></div>'
       +'<div><div class="fl-l">− 당사 부담 개발비</div><div class="fl-v">'+_fmtWon(pl.extra)+'</div><div class="pl-bar"><div style="width:'+pct(pl.extra)+'%;background:#90A4AE"></div></div></div>'
-      +'<div style="background:'+(pl.net>=0?'#E8F5E9':'#FFEBEE')+'"><div class="fl-l">= 영업이익</div><div class="fl-v" style="color:'+(pl.net>=0?'#2E7D32':'#C62828')+'">'+_fmtWon(pl.net)+' <span style="font-weight:400;color:#888">('+pl.netRate+'%)</span></div><div class="pl-bar"><div style="width:'+pct(pl.net)+'%;background:'+(pl.net>=0?'#43A047':'#E53935')+'"></div></div></div>'
+      +(pl.fixed>0?'<div><div class="fl-l" title="손익분석 🏠 월 고정비 — 이번 달은 지난 날수만큼 일할">− 고정비 (월세·차량 등)</div><div class="fl-v">'+_fmtWon(pl.fixed)+'</div><div class="pl-bar"><div style="width:'+pct(pl.fixed)+'%;background:#FFB74D"></div></div></div>':'')
+      +'<div style="background:'+(pl.op>=0?'#E8F5E9':'#FFEBEE')+'"><div class="fl-l">= 영업이익</div><div class="fl-v" style="color:'+(pl.op>=0?'#2E7D32':'#C62828')+'">'+_fmtWon(pl.op)+' <span style="font-weight:400;color:#888">('+pl.opRate+'%)</span></div><div class="pl-bar"><div style="width:'+pct(pl.op)+'%;background:'+(pl.op>=0?'#43A047':'#E53935')+'"></div></div></div>'
       +'</div>';
+    if(!(pl.fixed>0)&&(typeof canDo!=='function'||canDo('edit'))&&pl.cnt>0) h+='<div style="font-size:10px;color:#888;margin-top:6px">※ 월세·차량 같은 <b>월 고정비</b>는 아직 없습니다 — 손익분석의 🏠 월 고정비에 넣으면 영업이익이 그 비용까지 뺀 값으로 보입니다. <a href="#" onclick="event.preventDefault();switchTab(\'tab_profit\');setTimeout(function(){ try{ _fcEditing=true; renderFixedCostBox(); var b=document.getElementById(\'profit_fixed_section\'); if(b) b.scrollIntoView({block:\'center\'}); }catch(e){} },150)" style="color:#1565C0">넣으러 가기</a></div>';
     if(pl.devCount||pl.retCount){ h+='<div style="font-size:10px;color:#888;margin-top:6px">※ 개발비 '+pl.devCount+'건'+(pl.devMargin?'(청구 마진 '+_fmtWon(pl.devMargin)+')':'')+(pl.retCount?' · 반품·매출 가감 '+pl.retCount+'건':'')+' 포함 — 손익분석 탭과 같은 계산입니다. 매출원가는 출고한 물건의 원가(입고 기준 매입은 매입원장).</div>'; }
     if(pl.cnt===0&&!pl.devCount&&!pl.retCount){ h+='<div style="font-size:11px;color:#999;text-align:center;padding:8px">해당 기간 납품(출고) 데이터가 없습니다.</div>'; }
     body.innerHTML=h;
   })();
 
+  try{ renderCashFlowCard(); }catch(e){ console.warn('cash flow card',e); } // 자금 흐름 (v2.5.3)
   // 총 미수금 — 수금관리와 같은 계산 (거래처 잔액 기준: 달별 청구 = 공급가 + 부가세 10%, 더 받은 돈은 오래된 달부터 채움)
   var arAg=null; try{ arAg=calcArAging(today); }catch(e){ console.warn('calcArAging',e); }
   var totalUnpaid=arAg?arAg.total:0;
@@ -24080,8 +24269,8 @@ function renderDashboard(){
     var lastM=months[11], MP=_plByMonth(months[0]+'-01',lastM+'-'+('0'+new Date(+lastM.slice(0,4),+lastM.slice(5,7),0).getDate()).slice(-2));
     var mSales=[],mCost=[],mNet=[],mRate=[];
     months.forEach(function(m){
-      var r=MP[m]||{sales:0,cost:0,net:0,netRate:0};
-      mSales.push(Math.round(r.sales/10000)); mCost.push(Math.round(r.cost/10000)); mNet.push(Math.round(r.net/10000)); mRate.push(r.netRate);
+      var r=MP[m]||{sales:0,cost:0,net:0,netRate:0}; var _op=(r.op!==undefined?r.op:r.net), _or=(r.opRate!==undefined?r.opRate:r.netRate); // 고정비 뒤 영업이익 (v2.5.3)
+      mSales.push(Math.round(r.sales/10000)); mCost.push(Math.round(r.cost/10000)); mNet.push(Math.round(_op/10000)); mRate.push(_or);
     });
     var labels=months.map(function(m){ return m.slice(2,4)+'.'+m.slice(5)+'월'; });
     // 기존 차트 destroy
@@ -24639,14 +24828,14 @@ var H_TITLE_FIND={tab_home:'🏠 업무 현황',tab_calc:'#tab_calc .hdr',tab_or
 var HELP_TABS={
   tab_home:{t:'🏠 홈 (업무 현황)',d:'오늘 챙길 일을 한 화면에 모았습니다 — 이번 달 매출·발주액, 총 미수금, 납기 임박·지남, 미입고 발주, 데이터 검진 결과, 납품 달력.',
     s:['빨간 숫자(납기 지남·검진 오류)부터 확인하세요. 검진 카드의 버튼을 누르면 무엇이 어긋났는지와 [고치기]가 나옵니다.','폰에서는 맨 위 "🚚 오늘·내일 출고" 카드에서 바로 출고하고 거래명세표를 뽑습니다. 여러 품목은 카드의 체크칸을 골라 [🚚 한 번에 출고].','폰 홈의 "🔎 거래처 찾기"에 이름을 넣으면 미수금·최근 출고와 [수금 입력]·[명세표]가 나옵니다.'],
-    m:['처음 쓸 때는 홈 위쪽 안내대로 거래처 → 제품 → 당사정보 순서로 넣으세요.','홈의 총 미수금은 수금관리와 같은 숫자입니다. 다르게 보이면 🩺 데이터 검진을 돌려 보세요.'],
+    m:['처음 쓸 때는 홈 위쪽 안내대로 거래처 → 제품 → 당사정보 순서로 넣으세요.','홈의 총 미수금은 수금관리와 같은 숫자입니다. 다르게 보이면 🩺 데이터 검진을 돌려 보세요.','💵 자금 흐름 카드: 이달·다음달에 받을 돈(수금 예정 — 결제조건·부가세 포함)과 줄 돈(매입 결제 예정 — 입고 매입 × 1.1, 머리줄의 매입 결제조건)·고정비·차이를 보여 줍니다. 수금을 넣지 않으면 받을 돈이 실제보다 크게 보입니다.','손익 현황의 영업이익은 손익분석 🏠 월 고정비를 넣으면 그 비용(이번 달은 일할)까지 뺀 값입니다.'],
     b:[['🩺 데이터 검진','health'],['🚶 하루 업무 따라하기','tour']]},
   tab_calc:{t:'💰 단가계산기',d:'상자 형태·치수(장·폭·고)·골·원지로 원단 크기(전장·재단)·㎡ 단가·매당 원가·밴딩수·적재 패턴·차량 적재를 계산합니다.',
     s:['형태·장·폭·고·골형태·표면지·골심지·이면지를 넣습니다.','위쪽 결과(전장·재단(날개포함)·㎡ 단가·매당 원가)를 보고, 판매단가를 넣으면 마진율이 나옵니다.','아래에서 적재 패턴·차량별 최대 적재·파렛트 배치를 봅니다 (폰은 [펼치기]).'],
     m:['\'재단(날개포함)\'은 제품마스터·발주서와 같은 값입니다.','차량 적재 계산은 적재함 폭 2,350mm(5톤 장축 8.5M) 기준입니다. 실제 차량과 다르면 알려 주세요.'],
     b:[]},
   tab_order:{t:'📋 수주관리',d:'거래처에서 받은 주문(수주)을 넣습니다. 저장하면 발주관리에 "미발주" 줄이 생기고, 납기관리·홈 달력에 나옵니다.',
-    s:['[+ 수주 입력] → 거래처·품명·수량·납기일(납품처) → 저장.','저장하면 같은 거래처·날짜로 창이 다시 열려 다음 품목을 이어서 넣습니다. 다 넣었으면 [닫기].','창고 재고로 바로 납품하면 "📦 재고에서 출고(발주 안 함)"를 고르세요 — 발주·입고 줄을 만들지 않습니다.','늘 같은 품목을 주문하는 거래처는 수주 창의 [🔁 최근 수주]로 전에 주문한 품목·수량(단가)을 골라 채웁니다.','특가·견적 단가로 받은 수주는 창의 "💰 단가(이번 수주)" 칸에 넣으세요 — 출고 창에 그 단가가 미리 들어가고 그 출고는 그 단가로 고정됩니다(비우면 제품마스터 단가). 견적서의 [📋 수주로]가 견적 단가를 여기에 넣습니다.','PC 에서는 목록 머리글을 누르면 정렬, 우클릭으로 안 쓰는 열 숨기기, 머리글 끝을 끌어 열 폭(이 기기에 기억 — 다른 목록도 같음).','목록 위 상태 상자에서 "🚚 미완료"를 고르면 아직 나갈 수량이 남은 수주만 보입니다(끝난 수주는 "✅ 완료"). 고른 상태는 이 기기에 기억됩니다.'],
+    s:['[+ 수주 입력] → 거래처·품명·수량·납기일(납품처) → 저장.','저장하면 같은 거래처·날짜로 창이 다시 열려 다음 품목을 이어서 넣습니다. 다 넣었으면 [닫기].','창고 재고로 바로 납품하면 "📦 재고에서 출고(발주 안 함)"를 고르세요 — 발주·입고 줄을 만들지 않습니다.','늘 같은 품목을 주문하는 거래처는 수주 창의 [🔁 최근 수주]로 전에 주문한 품목·수량(단가)을 골라 채웁니다.','특가·견적 단가로 받은 수주는 창의 "💰 단가(이번 수주)" 칸에 넣으세요 — 출고 창에 그 단가가 미리 들어가고 그 출고는 그 단가로 고정됩니다(비우면 제품마스터 단가). 견적서의 [📋 수주로]가 견적 단가를 여기에 넣습니다.','단가 칸 옆에 마진(판매단가 − 제품마스터 매입단가)이 보이고, 5% 이하면 빨갛게 ⚠️ 표시되며 저장 뒤에도 빨간 안내가 뜹니다(저장은 됩니다 — 초도·샘플처럼 일부러 낮게 받는 경우).','PC 에서는 목록 머리글을 누르면 정렬, 우클릭으로 안 쓰는 열 숨기기, 머리글 끝을 끌어 열 폭(이 기기에 기억 — 다른 목록도 같음).','목록 위 상태 상자에서 "🚚 미완료"를 고르면 아직 나갈 수량이 남은 수주만 보입니다(끝난 수주는 "✅ 완료"). 고른 상태는 이 기기에 기억됩니다.'],
     m:['발주서를 낸 수주는 잠깁니다. 수량·품명을 바꾸려면 발주관리에서 [발주취소] 뒤 [수정], 납기일·납품처는 [📅 납기·납품처]로 언제든.','지운 수주는 🕘 이력 → 🗑 휴지통에서 되살릴 수 있습니다.'],
     b:[['+ 수주 입력','order']]},
   tab_po:{t:'🛒 발주관리',d:'수주로 생긴 "미발주" 줄을 발주처에 발주(발주서)합니다. 수주 없이 재고를 채우는 [＋ 재고용 발주]도 여기서.',
@@ -24663,7 +24852,7 @@ var HELP_TABS={
     b:[['📷 QR 출고','qr']]},
   tab_master:{t:'🏢 제품마스터',d:'거래처별 제품(품명·치수·원지·판매단가·발주처·매입단가·적재)을 등록합니다. 수주 창의 품명 목록이 여기서 나옵니다.',
     s:['왼쪽(폰은 위쪽)에서 거래처를 고르고 [+ 제품 등록] → 저장.','단가가 바뀌면 [수정](적용 시작일) 또는 [📅예약](앞으로 바뀔 단가). [📈이력]으로 지난 단가를 봅니다.','거래처에 보낼 단가표는 [📄 단가표] — 품명·규격·현재 단가·적용일·예정 단가가 한 장으로(인쇄·그림으로 저장).'],
-    m:['단가를 지난 날짜부터 바꾸면 이미 출고한 건도 바꿀지 묻습니다(마감한 달은 그대로).','매입단가를 바꾸면 적용 시작일을 묻고, 그 날짜 이후 이미 입고한 건의 매입단가도 바꿀지 묻습니다 — 바꾸면 매입원장과 그 수주로 나간 출고의 원가(손익)가 함께 바뀝니다(마감한 달은 그대로). 발주처 단가가 소급 인상·인하될 때 쓰세요.','품명을 바꾸면 지난 기록은 옛 품명 그대로 남습니다(확인창). 안 쓰는 제품은 지우지 말고 [사용 중지].'],
+    m:['판매단가·매입단가를 넣으면 그 아래에 마진(원·%)이 보이고 5% 이하면 빨갛게 ⚠️ 표시됩니다.','단가를 지난 날짜부터 바꾸면 이미 출고한 건도 바꿀지 묻습니다(마감한 달은 그대로).','매입단가를 바꾸면 적용 시작일을 묻고, 그 날짜 이후 이미 입고한 건의 매입단가도 바꿀지 묻습니다 — 바꾸면 매입원장과 그 수주로 나간 출고의 원가(손익)가 함께 바뀝니다(마감한 달은 그대로). 발주처 단가가 소급 인상·인하될 때 쓰세요.','품명을 바꾸면 지난 기록은 옛 품명 그대로 남습니다(확인창). 안 쓰는 제품은 지우지 말고 [사용 중지].'],
     b:[['+ 제품 등록','master_new']]},
   tab_client:{t:'🏬 거래처등록',d:'파는 곳(매출처)과 사는 곳(발주처)을 등록합니다 — 상호·사업자번호·결제조건·여신 한도·세금계산서 발행 대상·납품처.',
     s:['[+ 거래처 등록] → 업체명·구분(매출/매입)·사업자번호·결제조건 → 저장.','관리상호(짧은 이름)를 넣으면 수주 창 목록에 짧게 나옵니다.'],
@@ -24677,9 +24866,9 @@ var HELP_TABS={
     s:['기간·발주처를 고르고 합계를 확인 → [📥 엑셀 다운로드].','[🧾 매입 세금계산서 대조]: 홈택스 → 전자(세금)계산서 목록조회(매입) 엑셀을 올리면 발주처·달마다 계산서 금액과 매입원장이 맞는지(⚠️ 차이·❗ 계산서 없음·❓ 원장에 없음) 보여 줍니다.'],
     m:['매입은 입고 기준입니다 — 발주만 하고 입고하지 않은 것은 나오지 않습니다.','매입단가는 입고할 때 그 기록에 남습니다(나중에 제품 단가를 바꿔도 그대로).'],
     b:[['📦 입고관리로','go_stock']]},
-  tab_profit:{t:'💹 손익분석',d:'출고 건별·월별로 매출 − 매입원가 − 운반비·개발비 = 순이익을 봅니다(공급가 기준). 반품·매출 가감도 줄로 들어갑니다.',
-    s:['[건별 보기]·[월별 보기]를 고르고 기간을 정합니다.'],
-    m:['매출은 매출원장과 같은 숫자입니다. 원가는 그때 매입단가 기준.','목표 달성률은 "이번 달 순이익 ÷ 월 목표"입니다.'],
+  tab_profit:{t:'💹 손익분석',d:'출고 건별·월별로 매출 − 매입원가 − 운반비·개발비 = 순이익, 여기서 월 고정비(월세·차량 등)를 빼면 영업이익을 봅니다(공급가 기준). 반품·매출 가감도 줄로 들어갑니다.',
+    s:['[건별 보기]·[월별 보기]를 고르고 기간을 정합니다.','🏠 월 고정비 [입력]: 월세·차량 할부·연료·보험처럼 매달 거의 같은 경비를 항목별로 넣고 저장하면 홈·손익분석·차트·목표 달성률의 영업이익이 그 비용까지 뺀 값이 됩니다(이번 달은 지난 날수만큼 일할). 금액이 바뀌는 달(할부가 끝나는 달 등)은 적용 시작월을 그 달로 해서 새로 저장.'],
+    m:['매출은 매출원장과 같은 숫자입니다. 원가는 그때 매입단가 기준.','목표 달성률은 "이번 달 영업이익(고정비를 넣었으면 고정비 뒤) ÷ 월 목표"입니다.','거래처별 조회에는 고정비를 나누어 넣지 않습니다(회사 전체 비용).'],
     b:[]},
   tab_closing:{t:'🔒 마감관리 · 세금계산서 발행 준비',d:'한 달이 끝나면 그 달을 마감해 숫자를 고정하고, 아래에서 홈택스용 세금계산서 발행 자료를 만듭니다.',
     s:['마감 연월을 고르고 [🔒 마감 실행].','"세금계산서 발행 준비"에서 [📥 발행 데이터 엑셀] → 홈택스에서 발행 → 그 줄을 [발행완료]로.','[📄 명세서]로 거래처별 월 명세서를 뽑습니다.','홈택스에서 발행한 뒤에는 [🧾 홈택스 매출 발행 목록 대조] — 홈택스 매출 목록 엑셀을 올리면 거래처·달마다 금액을 맞춰 보고(✅ 같음은 미리 체크) [발행완료로 표시]로 상태·승인번호를 한 번에 넣습니다.','부가세 신고 때는 [📊 부가세 신고 자료] — 분기(1기·2기)를 고르면 매출처별·매입처별 합계가 나오고 CSV·엑셀로 세무사에게 보냅니다. 카드·현금영수증 매입은 그 창의 [💳 카드·현금영수증 매입 파일 올리기]로 더합니다(저장되지 않으니 신고 때마다 다시 올림).','[🔒 마감 실행] 확인창에 그 달 "출고 합 / 매출원장 / 세금계산서 준비" 합계가 같은지와 그 달 검진 오류·주의 건수가 함께 나옵니다 — ⚠️ 가 있으면 [취소]하고 🩺 데이터 검진에서 먼저 고치세요.'],
@@ -24739,7 +24928,7 @@ var HELP_FIX=[
   {k:'relogin',t:'로그인 화면에 "로그인 유지 기한이 지나…" · "접속을 끊었습니다"가 떠요',s:['👥 팀 창의 "로그인 유지 기한"(기본 30일)이 지났거나 소유자·관리자가 그 기기의 [접속 끊기]를 누른 것입니다 — 그냥 다시 로그인하면 됩니다. 자료는 그대로이고 올라가지 않았던 변경도 이어서 올라갑니다.','기한이 번거로우면 소유자가 👥 팀 창에서 "없음"으로 바꿀 수 있습니다.'],b:[['👥 팀·로그인','team']]}
 ];
 // 이번 판에서 바뀐 점 (README ⑩ v2.5.0 간추림)
-var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억) · 제품마스터 매입단가를 바꿀 때 이미 입고한 건(열린 달)에도 소급할지 묻기.'];
+var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억) · 제품마스터 매입단가를 바꿀 때 이미 입고한 건(열린 달)에도 소급할지 묻기.','v2.5.2: 거래처 수금조건에 마감후 30일·40일·45일 추가 (수금예정일 = 그 달 말일 + N일).','v2.5.3: 손익분석 🏠 월 고정비(월세·차량 등) → 홈·손익분석·차트·목표의 영업이익이 고정비까지 뺀 값으로 · 수주 창·제품마스터 창에 마진 표시, 5% 이하면 ⚠️(저장 뒤 빨간 안내) · 홈 💵 자금 흐름 카드(이달·다음달 받을 돈·줄 돈·고정비·차이, 매입 결제조건).'];
 // 도움말 버튼이 부르는 동작 (버튼에는 키만 — 이름·자료는 넣지 않음)
 function _hCan(act){ try{ return typeof canDo==='function'?canDo(act)!==false:true; }catch(e){ return true; } }
 function _hNoEdit(){ try{ showInfoToast('🔒 보기 전용 권한이라 입력 창을 열 수 없습니다.','#B71C1C'); }catch(e){} }
