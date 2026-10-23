@@ -1979,7 +1979,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.5.3</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.5.4</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -2685,6 +2685,7 @@ if(fbReady){
           <button onclick="copyMasterSelected()" style="padding:7px 14px;background:#6D4C41;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">📋 복사</button>
           <button onclick="openMasterMove()" style="padding:7px 14px;background:#E8EAF6;color:#3949AB;border:1px solid #9FA8DA;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🔀 제품이동</button>
           <button onclick="openMasterModal()" style="padding:7px 16px;background:#4E342E;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">+ 제품 등록</button>
+          <button onclick="openCommonMergeModal()" title="여러 거래처에 따로 등록한 같은 품목(랩·밴딩끈 등)을 공용 품목 하나로 묶기 — 거래처별 단가는 그대로 옮겨짐" style="padding:7px 12px;background:#E0F2F1;color:#00695C;border:1px solid #80CBC4;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🧷 공용으로 묶기</button>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -3622,6 +3623,16 @@ if(fbReady){
         <input type="text" id="m_code" readonly style="width:100%;padding:7px;border:1px solid #EEE;border-radius:6px;font-size:12px;background:#F5F5F5;font-family:monospace"></div>
       <div><label style="font-size:10px;color:#666;font-weight:600;display:block;margin-bottom:3px">거래처</label>
         <input type="text" id="m_client" list="cl_datalist" placeholder="거래처명" onchange="if(+document.getElementById('m_edit_idx').value===-1){document.getElementById('m_code').value=autoMasterCode(undefined,this.value);}" style="width:100%;padding:7px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px"></div>
+      <!-- 공용 품목 · 단위 (v2.5.4) -->
+      <div style="grid-column:1/-1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#E0F2F1;border:1px solid #80CBC4;border-radius:8px;padding:7px 10px">
+        <label style="font-size:11px;font-weight:700;color:#00695C;display:flex;align-items:center;gap:5px;cursor:pointer;margin:0"><input type="checkbox" id="m_common" onchange="_mCommonToggle()"> 🧷 공용 품목</label>
+        <span style="font-size:10px;color:#00695C">모든 거래처에 파는 품목(스트레치필름·밴딩끈 등) — 거래처별 단가, 재고는 하나</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;margin-left:auto"><span style="color:#555;font-weight:600">단위</span><select id="m_unit" style="padding:5px 7px;border:1px solid #80CBC4;border-radius:5px;font-size:12px;background:#fff"></select></span>
+      </div>
+      <div id="m_common_prices" style="grid-column:1/-1;display:none;background:#F1F8F6;border:1px solid #B2DFDB;border-radius:8px;padding:8px 10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#00695C">거래처별 단가 (없는 거래처는 아래 기본 판매단가)</span><button type="button" onclick="_mCpAddRow()" style="padding:4px 10px;background:#fff;color:#00695C;border:1px solid #80CBC4;border-radius:5px;font-size:11px;cursor:pointer">+ 거래처</button></div>
+        <div id="m_cp_rows"></div>
+      </div>
       <div style="grid-column:1/-1"><label style="font-size:10px;color:#666;font-weight:600;display:block;margin-bottom:3px">품명</label>
         <input type="text" id="m_product" placeholder="품명" style="width:100%;padding:7px;border:1px solid #D0D8E4;border-radius:6px;font-size:12px"></div>
       <div><label style="font-size:10px;color:#666;font-weight:600;display:block;margin-bottom:3px">골</label>
@@ -6006,9 +6017,32 @@ function findClient(name){
 }
 function canonClient(name){ var c=findClient(name); return c?_nm(c.name):_nm(name); }
 function sameClient(a,b){ return canonClient(a)===canonClient(b); }
+// ── 공용 품목 (v2.5.4) ── 스트레치필름·밴딩끈처럼 모든 거래처에 파는 품목: 제품마스터에 거래처 '(공용)' 으로 한 번만 등록 (common:true · unit · clientPrices:[{client,price}])
+//  · 어느 거래처의 수주·출고·견적에서도 품명 목록에 [공용]으로 나오고, 단가는 거래처별 단가 → 없으면 기본 단가 (수주 창의 '단가(이번 수주)'가 있으면 그것)
+//  · 재고는 거래처와 상관없이 하나로 — 재고 키(_itemKeyOf)·재고시트·선입선출 로트가 '(공용)' 으로 묶임. 입고는 재고용 발주('(공용)' 선택) 또는 어느 수주의 발주로든 들어와도 같은 재고
+//  · 사용 중지한 거래처별 제품과 같은 품명의 공용 품목이 있으면 그 거래처의 지난 기록(재고·출고)도 공용으로 봄 — [공용으로 묶기]로 옮긴 뒤 재고가 이어지게
+var COMMON_CLIENT='(공용)';
+var UNIT_OPTIONS=['매','박스','롤','권','개','EA','세트','kg','장'];
+function _commonMasterOf(product){
+  var pn=_nm(product); if(!pn) return null;
+  var L=getIdx().masterByName[pn]||[], i;
+  for(i=0;i<L.length;i++){ if(L[i]&&L[i].common&&!L[i].inactive) return L[i]; }
+  for(i=0;i<L.length;i++){ if(L[i]&&L[i].common) return L[i]; }
+  return null;
+}
+function isCommonProduct(client,product){ var m=findMasterRec(client,product,true); return !!(m&&m.common); }
+function unitOf(client,product){ var m=findMasterRec(client,product); var u=(m&&m.unit)?String(m.unit).trim():''; return u||'매'; }
+function _commonClientPrice(m,client){
+  if(!m||!Array.isArray(m.clientPrices)||!client) return 0;
+  var cc=canonClient(client);
+  for(var i=0;i<m.clientPrices.length;i++){ var x=m.clientPrices[i]; if(x&&x.client&&canonClient(x.client)===cc&&(+x.price>0)) return Math.round(+x.price); }
+  return 0;
+}
 function findMasterRec(client,product,exact){
   var p=_nm(product); if(!p) return null;
   var I=getIdx(), m=I.masterByCanon[canonClient(client)+'‖'+p];
+  if(m&&!m.inactive) return m;
+  var cm=_commonMasterOf(p); if(cm) return cm; // 공용 품목 (사용 중지한 거래처별 제품보다 우선 — v2.5.4)
   if(m||exact) return m||null;
   // 거래처로 못 찾으면 품명만으로 — 그 품명(옛 품명 포함)을 가진 제품이 하나뿐일 때만 (다른 거래처 단가가 잘못 쓰이지 않게)
   var L=I.masterByName[p]; return (L&&L.length===1)?L[0]:null;
@@ -6023,7 +6057,9 @@ function saleUnitPrice(d,o){
   if(_hasNum(d.unitPrice)) return +d.unitPrice;
   var client=d.client||(o&&o.client)||'', product=d.product||(o&&o.product)||'';
   var date=d.date||d.lastOutDate||(o&&(o.lastOutDate||o.date))||'';
-  return getPriceAt(findMasterRec(client,product),date);
+  var m=findMasterRec(client,product);
+  if(m&&m.common){ var cp=_commonClientPrice(m,client); if(cp>0) return cp; } // 공용 품목: 거래처별 단가 → 없으면 기본 단가 (v2.5.4)
+  return getPriceAt(m,date);
 }
 // 사람이 직접 넣은 출고 단가인가 (R1-01·R1-02) — 출고 창·✏️ 수정에서 단가 칸을 그날 단가와 다르게 넣었거나 0원(무상·샘플)으로 넣은 출고 (deliveries[i].priceManual=true).
 //  예전 자료: 단가가 0 으로 기록된 출고도 사람이 넣은 것으로 봄. 이런 출고는 출고일을 바꿔도·제품 단가를 지난 날짜부터 바꿔도 단가를 다시 매기지 않음
@@ -6267,7 +6303,7 @@ function _healthFixR1(f){
   }
   return undefined;
 }
-function _itemKeyOf(client,product){ var cc=canonClient(client), m=findMasterRec(cc,product,true); return cc+'‖'+(m?_nm(m.product):_nm(product)); }
+function _itemKeyOf(client,product){ var cc=canonClient(client), m=findMasterRec(cc,product,true); if(m&&m.common) return COMMON_CLIENT+'‖'+_nm(m.product); return cc+'‖'+(m?_nm(m.product):_nm(product)); } // 공용 품목은 거래처와 상관없이 한 재고 (v2.5.4)
 function itemStockInfo(client,product){
   var I=getIdx(), M=I._itemStock;
   if(!M){
@@ -7420,7 +7456,7 @@ function autoMasterCode(excludeIdx,clientName){
   const master=loadData('master'),clients=loadData('clients');
   const cName=clientName||(selMasterClient==='__none__'?'':selMasterClient);
   const client=findClient(cName)||clients.find(function(c){return c&&c.name===cName;}); // 이름을 바꾼 거래처의 옛 이름도 그 거래처로
-  const clientCode=client&&client.code?client.code:'C0000';
+  const clientCode=(cName===COMMON_CLIENT)?'G0000':(client&&client.code?client.code:'C0000'); // 공용 품목은 G0000-xxx (v2.5.4)
   const clientProducts=master.filter(function(m,i){return !!m&&String(m.code||'').startsWith(clientCode+'-')&&i!==excludeIdx;}); // null·숫자 관리번호도 (R2-14)
   let max=0;
   clientProducts.forEach(function(m){const parts=(m.code||'').split('-');const num=+parts[parts.length-1];if(num)max=Math.max(max,num);});
@@ -7810,7 +7846,7 @@ function renderOrders(){
       +'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-size:11px">'+(e(o.flute)||'-')+'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-size:11px">'+(e(S(o.paper).toUpperCase())||'-')+'</td>'
-      +'<td style="padding:6px;text-align:right;border-bottom:1px solid #EEE;font-weight:600;font-size:11px">'+(+o.qty||0).toLocaleString()+((+o.unitPrice>0)?'<div style="font-size:9px;color:#1565C0;font-weight:400;white-space:nowrap" title="이번 수주 단가 (원/매) — 출고 때 이 단가가 기본값">단가 '+(+o.unitPrice).toLocaleString()+'</div>':'')+'</td>' // 이번 수주 단가 (WP-O S-O3 — 칸 안 작은 글자, td 개수 그대로)
+      +'<td style="padding:6px;text-align:right;border-bottom:1px solid #EEE;font-weight:600;font-size:11px">'+(+o.qty||0).toLocaleString()+(function(){ var _u=unitOf(o.client,o.product); return _u!=='매'?' <span style="font-size:9px;color:#00695C">'+e(_u)+'</span>':''; })()+((+o.unitPrice>0)?'<div style="font-size:9px;color:#1565C0;font-weight:400;white-space:nowrap" title="이번 수주 단가 (원/매) — 출고 때 이 단가가 기본값">단가 '+(+o.unitPrice).toLocaleString()+'</div>':'')+'</td>' // 이번 수주 단가 (WP-O S-O3 — 칸 안 작은 글자, td 개수 그대로)
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-size:11px;font-weight:600;color:#BF360C">'+(e(o.due)||'-')+'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE">'+(due!==null&&isFinite(due)?ddayBadge(due,_orderShipDone(o)?'완료':o.status):'-')+'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-size:11px">'+(e(o.dest)||'-')+'</td>'
@@ -10246,7 +10282,7 @@ function _buildReceiptDoc(orderList, outNo, showPrice, selectedDevCostIds, mc, o
     var outQty=(item.batchQty!=null)?item.batchQty:(+(o.outQty||0)||+(o.qty||0));
     var supplyAmt=Math.round(unitPrice*outQty); // 원 단위 (R1-13 — 매출원장·세금계산서와 같은 반올림)
     var rowDate=(o.lastOutDate||o.date||'').replace(/^(\d{4})-(\d{2})-(\d{2}).*$/,'$2/$3');
-    return {product:o.product,spec:'',qty:outQty,uprice:unitPrice,supply:supplyAmt,date:rowDate,note:dests.length>1?destOf(o):''};
+    return {product:o.product,spec:'',qty:outQty,uprice:unitPrice,supply:supplyAmt,date:rowDate,note:dests.length>1?destOf(o):'',unit:unitOf(o.client,o.product)}; // 단위 (v2.5.4)
   });
   // 청구 개발비 → 거래명세서 품목 추가 (팝업에서 선택된 것만)
   if(selectedDevCostIds && selectedDevCostIds.length>0){
@@ -10303,7 +10339,7 @@ function _buildReceiptDoc(orderList, outNo, showPrice, selectedDevCostIds, mc, o
       var it=pageItems[r];
       var itTax=it?(it._tax!==undefined?it._tax:vatOf(it.supply)):0;
       if(it){
-        var unitLabel=it.isExtra?'':'매';
+        var unitLabel=it.isExtra?'':(it.unit||'매'); // 공용 품목은 박스·롤 등 (v2.5.4)
         var qtyLabel=it.isExtra?'':( it.qty?E(it.qty.toLocaleString()):'' );
         var nameTxt=(it.product||'')+(it.isExtra?'':it.spec?' ('+it.spec+')':''), nameLen=nameTxt.length; // 긴 품명은 글자를 줄이고 두 줄까지 (잘리지 않게)
         // 칸 너비(약 234px)에 한글이 10px 로 22자, 8.5px 로 26자까지 한 줄 — 더 길면 7.5px 두 줄(60자쯤까지), 그보다 길면 6.5px
@@ -10552,8 +10588,9 @@ function renderMasterClientList(){
   // 왼쪽 거래처 목록: 전체 · 등록된 거래처(이름을 바꾼 거래처의 옛 이름으로 된 제품도 그 거래처로 셈) · 등록 안 된 거래처 이름의 제품
   //  (예전에는 거래처등록에 없는 이름으로 저장한 제품이 '전체'에서만 보였음 — A1-20)
   const cnt={}; let none=0;
-  master.forEach(function(m){ if(!m) return; const c=m.client?findClient(m.client):null; if(c&&c.name) cnt[c.name]=(cnt[c.name]||0)+1; else none++; });
-  const items=[{key:'전체',label:'전체',n:master.length}], seen={};
+  let commonN=0;
+  master.forEach(function(m){ if(!m) return; if(m.common){ commonN++; return; } const c=m.client?findClient(m.client):null; if(c&&c.name) cnt[c.name]=(cnt[c.name]||0)+1; else none++; });
+  const items=[{key:'전체',label:'전체',n:master.length},{key:COMMON_CLIENT,label:'🧷 공용 품목',n:commonN}], seen={}; // 공용 품목 (v2.5.4)
   clients.forEach(function(c){ if(!c||!c.name||seen[c.name]) return; seen[c.name]=1; items.push({key:c.name,label:c.name,n:cnt[c.name]||0,off:!!c.inactive}); });
   if(none) items.push({key:'__none__',label:'⚠️ 등록 안 된 거래처',n:none,warn:true});
   el.innerHTML=items.map(function(it){
@@ -10571,12 +10608,14 @@ function renderMasterClientList(){
 function selectMasterClient(name){
   selMasterClient=name==='전체'?'':name;
   const label=document.getElementById('master_selected_client');
-  if(label) label.textContent=name==='전체'?'전체 제품':(name==='__none__'?'거래처등록에 없는 거래처의 제품 ([수정]에서 거래처를 고르세요)':name);
+  if(label) label.textContent=name==='전체'?'전체 제품':(name==='__none__'?'거래처등록에 없는 거래처의 제품 ([수정]에서 거래처를 고르세요)':(name===COMMON_CLIENT?'🧷 공용 품목 — 모든 거래처에 파는 품목 (스트레치필름·밴딩끈 등 · 거래처별 단가 · 재고 하나)':name));
   renderMasterClientList(); renderMaster();
 }
 // 제품 줄이 왼쪽에서 고른 거래처의 것인지 (이름을 바꾼 거래처의 옛 이름도 같은 거래처)
 function _masterInSel(m){
   if(!selMasterClient) return true;
+  if(selMasterClient===COMMON_CLIENT) return !!m.common;
+  if(m.common) return false;
   if(selMasterClient==='__none__') return !(m.client&&findClient(m.client));
   return canonClient(m.client)===canonClient(selMasterClient);
 }
@@ -10607,14 +10646,15 @@ function renderMaster(){
       if(cl&&cl.alias) return cl.alias;
       return '-';
     })();
-    const E=_ddEsc, _noCl=!(m.client&&findClient(m.client));
+    const E=_ddEsc, _noCl=!m.common&&!(m.client&&findClient(m.client));
     return '<tr style="background:'+bg+(m.inactive?';color:#888':'')+'">'
       +'<td style="padding:6px 4px;text-align:center;border-bottom:1px solid #EEE"><input type="checkbox" class="row-chk-master" data-idx="'+i+'"></td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-family:monospace;font-size:10px;color:#555">'+E(m.code||'-')+'</td>'
       +'<td style="padding:6px;text-align:left;border-bottom:1px solid #EEE;max-width:200px;overflow:hidden">'
         +'<div style="font-weight:600;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+E(m.product||'')+'">'+E(m.product||'-')
           +(m.inactive?' <span style="font-size:9px;font-weight:700;background:#ECEFF1;color:#607D8B;border:1px solid #CFD8DC;border-radius:8px;padding:0 5px">사용 중지</span>':'')+'</div>'
-        +((!selMasterClient||_noCl)?'<div style="font-size:9px;color:'+(_noCl?'#C62828':'#8D6E63')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+(_noCl?'거래처등록에 없는 거래처 이름 — 수주 창의 품명 목록에 나오지 않습니다':'')+'">'+(_noCl?'⚠️ ':'')+E(m.client||'(거래처 없음)')+'</div>':'')
+        +(m.common?'<div style="font-size:9px;color:#00695C;white-space:nowrap" title="모든 거래처의 수주·출고 품명 목록에 [공용]으로 나오고, 재고는 하나로 묶입니다">🧷 공용 · 단위 '+E(m.unit||'매')+(Array.isArray(m.clientPrices)&&m.clientPrices.length?' · 거래처별 단가 '+m.clientPrices.length+'곳':'')+'</div>':'')
+        +((!m.common&&(!selMasterClient||_noCl))?'<div style="font-size:9px;color:'+(_noCl?'#C62828':'#8D6E63')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+(_noCl?'거래처등록에 없는 거래처 이름 — 수주 창의 품명 목록에 나오지 않습니다':'')+'">'+(_noCl?'⚠️ ':'')+E(m.client||'(거래처 없음)')+'</div>':'')
         +((_toolMap[(m.client||'')+'‖'+(m.product||'')]||(+m.safety_stock||0)>0)?'<div style="font-size:9px;color:#607D8B;white-space:nowrap">'+(_toolMap[(m.client||'')+'‖'+(m.product||'')]?'🛠️ 자산 '+_toolMap[(m.client||'')+'‖'+(m.product||'')]+' ':'')+((+m.safety_stock||0)>0?'📦 안전재고 '+(+m.safety_stock).toLocaleString():'')+'</div>':'')
         +(function(){ var _inks=[m.ink1,m.ink2,m.ink3,m.ink4].filter(Boolean); if(!_inks.length) return ''; return '<div style="display:flex;gap:3px;margin-top:2px" title="잉크: '+E(_inks.join(' / '))+'">'+_inks.map(function(c){ var _i=(typeof getInkColorInfo==='function')?getInkColorInfo(c):null; return '<span style="display:inline-block;width:11px;height:11px;border-radius:2px;'+(_i?'background:'+E(_i.hex)+';border:1px solid rgba(0,0,0,0.25)':'border:1px dashed #999')+'"></span>'; }).join('')+'</div>'; })()
       +'</td>'
@@ -10752,13 +10792,17 @@ function fillOrderProductDatalist(){
     if(seen.has(m.product)) return false;
     seen.add(m.product); return true;
   });
+  // 공용 품목 (v2.5.4): 어느 거래처를 골라도 목록 끝에 [공용]으로
+  const commons=master.filter(function(m){ if(!m||!m.common||!m.product) return false; if(m.inactive&&m.product!==cur) return false; if(seen.has(m.product)) return false; seen.add(m.product); return true; });
   if(sel&&sel.tagName==='SELECT'){
-    if(client && filtered.length===0){
+    if(client && filtered.length===0 && commons.length===0){
       sel.innerHTML='<option value="">-- 마스터에 등록된 품목 없음 --</option>';
     } else {
       // 품명만 표시 (관리번호는 수주입력 목록에 보이지 않게)
       sel.innerHTML='<option value="">-- 품명 선택 --</option>'+filtered.map(function(m){
         return '<option value="'+_ddEsc(m.product)+'">'+_ddEsc(m.product)+(m.inactive?' (사용 중지)':'')+'</option>';
+      }).join('')+commons.map(function(m){
+        return '<option value="'+_ddEsc(m.product)+'" data-common="1">🧷 [공용] '+_ddEsc(m.product)+(m.unit&&m.unit!=='매'?' ('+_ddEsc(m.unit)+')':'')+(m.inactive?' (사용 중지)':'')+'</option>';
       }).join('');
     }
     if(cur&&Array.prototype.some.call(sel.options,function(o){ return o.value===cur; })) sel.value=cur;
@@ -10951,6 +10995,10 @@ function fillOrderFromProduct(){
     _orderStockInfoUpdate();
     return;
   }
+  if(found.common){ // 공용 품목 (v2.5.4): 재고에서 출고가 기본 (새 수주일 때) · 안내
+    try{ var _ssc=document.getElementById('o_stock_ship'); if(_ssc&&!_ssc.checked&&+((document.getElementById('o_edit_idx')||{}).value)<0) _ssc.checked=true; }catch(e){}
+    if(hint){ var _cpv=_commonClientPrice(found,clientName); hint.style.display=''; hint.innerHTML='🧷 공용 품목 · 단위 <b>'+_ddEsc(found.unit||'매')+'</b> · '+(_cpv>0?'이 거래처 단가 <b>'+_cpv.toLocaleString()+'원</b> (기본 '+(+found.price||0).toLocaleString()+'원)':'거래처별 단가 없음 → 기본 단가 <b>'+(+found.price||0).toLocaleString()+'원</b>')+' · 재고는 거래처와 상관없이 하나로 관리되어 "재고에서 출고"가 기본입니다.'; }
+  }
   if(found.flute) document.getElementById('o_flute').value=String(found.flute).trim().replace(/\s*골$/,'')+'골';
   if(found.paper) document.getElementById('order_paper').value=found.paper;
   if(found.jang)  document.getElementById('o_jang').value=found.jang;
@@ -10984,8 +11032,9 @@ function _orderStockInfoUpdate(){
   var idx=+((document.getElementById('o_edit_idx')||{}).value); var me=idx>=0?loadData('orders')[idx]:null;
   var mine=(me&&me.stockShip)?orderRemainQty(me):0, others=Math.max(0,inf.claimed-mine);
   var avail=Math.max(0,inf.free-others), f=function(n){ return (+n||0).toLocaleString(); };
-  var t='현재고 <b>'+f(inf.onHand)+'</b>매 · 다른 수주 몫(이미 들어온 것) '+f(inf.reserved)+'매'+(others?' · 다른 재고 출고 수주 '+f(others)+'매':'')+' → 쓸 수 있는 재고 <b style="color:#00695C">'+f(avail)+'</b>매';
-  if(on&&qty>avail) t+='<div style="color:#C62828;font-weight:700;margin-top:2px">⚠️ 쓸 수 있는 재고보다 '+f(qty-avail)+'매 많습니다 — 곧 들어올 재고(재고용 발주 등)가 있으면 그대로 저장해도 됩니다. 아니면 체크를 풀어 발주하세요.</div>';
+  var u=unitOf(client,product); // 단위 (v2.5.4)
+  var t='현재고 <b>'+f(inf.onHand)+'</b>'+u+' · 다른 수주 몫(이미 들어온 것) '+f(inf.reserved)+u+(others?' · 다른 재고 출고 수주 '+f(others)+u:'')+' → 쓸 수 있는 재고 <b style="color:#00695C">'+f(avail)+'</b>'+u;
+  if(on&&qty>avail) t+='<div style="color:#C62828;font-weight:700;margin-top:2px">⚠️ 쓸 수 있는 재고보다 '+f(qty-avail)+u+' 많습니다 — 곧 들어올 재고(재고용 발주 등)가 있으면 그대로 저장해도 됩니다. 아니면 체크를 풀어 발주하세요.</div>';
   else if(on) t+='<div style="color:#00695C;margin-top:2px">발주·입고 줄을 만들지 않습니다. 납기관리에서 재고로 출고하세요.</div>';
   else if(avail>0&&qty>0&&qty<=avail) t+='<div style="color:#00695C;margin-top:2px">재고로 충분합니다 — 발주하지 않고 재고에서 내보내려면 위 칸을 체크하세요.</div>';
   el.innerHTML=t;
@@ -12191,7 +12240,7 @@ function _poDocHtml(d){
     var bonghap=(sp.bonghap&&sp.bonghap!=='없음')?E(sp.bonghap):'-', pallet=sp.pallet_type?E(sp.pallet_type):'-';
     var inks=Array.isArray(sp.inks)?sp.inks.filter(Boolean):[], inkStr=inks.length?inkChipsHtml(inks,9):'-';
     var price=+p.buy_price||0, amt=Math.round(price*qty); totalAmt+=amt;
-    var qtyDisplay='<strong>'+qty.toLocaleString()+'</strong>'+(palletQtyVal?'<br><span style="font-size:9px;color:#555">('+palletQtyVal.toLocaleString()+'개/P)</span>':'');
+    var qtyDisplay='<strong>'+qty.toLocaleString()+'</strong>'+((p.unit&&p.unit!=='매')?' '+E(p.unit):'')+(palletQtyVal?'<br><span style="font-size:9px;color:#555">('+palletQtyVal.toLocaleString()+'개/P)</span>':''); // 단위 (v2.5.4)
     return '<tr>'
       +'<td style="'+td+'">'+(i+1)+'</td>'
       +'<td style="padding:7px 6px;border:1px solid #ccc;text-align:left"><div style="font-size:14px">'+poPrintText(p.product||'-')+'</div>'+(sp.buy_code?'<div style="font-size:14px;font-weight:700;color:#1A237E">'+poPrintText(sp.buy_code)+'</div>':'')+'</td>'
@@ -12245,7 +12294,7 @@ function _poDocHtml(d){
     +'<div style="display:flex"><span style="'+il+'">담당자</span><span style="'+iv+'">'+E(d.mgr||'')+(d.mgr&&mc.tel?' <span style="color:#555">('+E(mc.tel)+')</span>':'')+'</span></div>'
     +'</div></div>'
     +'<table><colgroup>'+cols.map(function(w){ return '<col style="width:'+w+'%">'; }).join('')+'</colgroup>'
-    +'<thead><tr><th>No</th><th style="text-align:left">품명</th><th>골</th><th>원지구성</th><th>전장</th><th>전폭</th><th>절수</th><th>장×폭×고</th><th>적재방수</th><th>밴딩수</th><th>단수</th><th>수량(매)</th>'+(showPrice?'<th>단가(원)</th><th>금액(원)</th>':'')+'<th>납기일</th><th>봉합</th><th>파렛트</th><th>잉크</th><th>비고</th></tr></thead>'
+    +'<thead><tr><th>No</th><th style="text-align:left">품명</th><th>골</th><th>원지구성</th><th>전장</th><th>전폭</th><th>절수</th><th>장×폭×고</th><th>적재방수</th><th>밴딩수</th><th>단수</th><th>수량</th>'+(showPrice?'<th>단가(원)</th><th>금액(원)</th>':'')+'<th>납기일</th><th>봉합</th><th>파렛트</th><th>잉크</th><th>비고</th></tr></thead>'
     +'<tbody>'+tableRows
     +'<tr style="font-weight:700;background:#f5f5f5"><td colspan="11" style="text-align:right">합계</td>'
     +'<td>'+totalQty.toLocaleString()+'매</td>'+(showPrice?'<td></td><td>'+totalAmt.toLocaleString()+'원</td>':'')+'<td colspan="5"></td></tr>'
@@ -12485,7 +12534,7 @@ function openStockPOModal(client,product,qty){
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:14px;font-weight:700;color:#00695C">📦 재고용 발주 (수주 없이)</div><button onclick="document.getElementById(\'stockpo_overlay\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888">✕</button></div>'
     +'<div style="font-size:11px;color:#555;background:#F1F8F6;border-radius:6px;padding:7px 10px;margin-bottom:10px;line-height:1.5">안전재고를 채우거나 미리 사 둘 때 씁니다. 저장하면 발주관리에 <b>미발주 줄</b>로 들어가고, 체크해서 [발주]하면 발주서가 나가고 입고 대기 줄이 생깁니다. 입고하면 그 품목의 재고가 되어 \'재고에서 출고\' 수주에 쓸 수 있습니다.</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
-      +'<div><label style="'+lb+'">거래처 (그 제품의 거래처)</label><select id="spo_client" style="'+inp+';background:#fff"><option value="">-- 거래처 선택 --</option>'+clients.map(function(c){ return '<option value="'+_ddEsc(c.name)+'">'+_ddEsc(c.alias||c.name)+'</option>'; }).join('')+'</select></div>'
+      +'<div><label style="'+lb+'">거래처 (그 제품의 거래처)</label><select id="spo_client" style="'+inp+';background:#fff"><option value="">-- 거래처 선택 --</option>'+(loadData('master').some(function(m){ return m&&m.common; })?'<option value="'+_ddEsc(COMMON_CLIENT)+'">🧷 공용 품목</option>':'')+clients.map(function(c){ return '<option value="'+_ddEsc(c.name)+'">'+_ddEsc(c.alias||c.name)+'</option>'; }).join('')+'</select></div>'
       +'<div><label style="'+lb+'">품명</label><select id="spo_product" style="'+inp+';background:#fff"><option value="">-- 품명 선택 --</option></select></div>'
       +'<div style="grid-column:1/-1" id="spo_info"></div>'
       +'<div><label style="'+lb+'">수량 (매)</label><input type="number" id="spo_qty" min="1" step="1" inputmode="numeric" style="'+inp+'"></div>'
@@ -12532,13 +12581,13 @@ function saveStockPO(){
   if(_vNum(document.getElementById('spo_price')||'',{label:'매입단가',min:0,int:true,allowEmpty:true})===null) return;
   var d=calcDims(+m.jang||0,+m.pok||0,+m.go||0);
   var pos=loadData('pos');
-  pos.push({date:today(),num:'',vendor:vendor,product:m.product,flute:m.flute?String(m.flute).trim().replace(/\s*골$/,'')+'골':'',paper:m.paper||'',qty:q,unit:'매',due:due,
+  pos.push({date:today(),num:'',vendor:vendor,product:m.product,flute:m.flute?String(m.flute).trim().replace(/\s*골$/,'')+'골':'',paper:m.paper||'',qty:q,unit:(m.unit||'매'),due:due,
     dest:'',jang:+m.jang||0,pok:+m.pok||0,go:+m.go||0,jeonj:d?d.전장:'',jeonp:d?d.jeonp:'',rp:d?d.재단p:'',nalgae:d?d.nalgae:'',jeolsu:d?d.jeolsu:'',
     buy_price:+g('spo_price')||0,status:'미발주',note:_nm(g('spo_note')),fromOrder:'',stockOnly:true,client:canonClient(m.client)});
   if(saveData('pos',pos)===false) return;
   var ov=document.getElementById('stockpo_overlay'); if(ov) ov.remove();
   renderAll();
-  try{ showInfoToast('📦 재고용 발주 줄을 만들었습니다 ('+m.product+' '+q.toLocaleString()+'매) — 발주관리에서 체크하고 [발주]를 누르세요.','#00695C'); }catch(e){}
+  try{ showInfoToast('📦 재고용 발주 줄을 만들었습니다 ('+m.product+' '+q.toLocaleString()+(m.unit||'매')+') — 발주관리에서 체크하고 [발주]를 누르세요.','#00695C'); }catch(e){}
 }
 
 // ════ 입고 처리 ════
@@ -13167,6 +13216,92 @@ function cancelStock(idx){
   try{ showInfoToast('↩ 입고취소 완료 — '+(item.inNo||'')+' '+(item.product||'')+' (미입고로 되돌림)','#E65100'); }catch(e){} // A8-13
 }
 
+// ── 제품 창의 공용 품목 칸 (v2.5.4) ──
+function _mUnitFill(cur){ var sel=document.getElementById('m_unit'); if(!sel) return; var u=String(cur||'매'); var opts=UNIT_OPTIONS.slice(); if(opts.indexOf(u)===-1) opts.push(u); sel.innerHTML=opts.map(function(x){ return '<option value="'+_ddEsc(x)+'"'+(x===u?' selected':'')+'>'+_ddEsc(x)+'</option>'; }).join(''); }
+function _mCommonFill(m){
+  var cb=document.getElementById('m_common'); if(!cb) return;
+  cb.checked=!!(m&&m.common); _mUnitFill(m&&m.unit?m.unit:'매');
+  var rows=document.getElementById('m_cp_rows'); if(rows) rows.innerHTML='';
+  if(m&&Array.isArray(m.clientPrices)) m.clientPrices.forEach(function(x){ if(x&&x.client) _mCpAddRow(x.client,+x.price||0); });
+  _mCommonToggle(true);
+}
+function _mCommonToggle(keepClient){
+  var cb=document.getElementById('m_common'), on=!!(cb&&cb.checked), idx=+((document.getElementById('m_edit_idx')||{}).value), cl=document.getElementById('m_client');
+  var box=document.getElementById('m_common_prices'); if(box) box.style.display=on?'':'none';
+  if(cl){ if(on){ if(!cl.dataset.prev&&cl.value!==COMMON_CLIENT) cl.dataset.prev=cl.value; cl.value=COMMON_CLIENT; cl.readOnly=true; cl.style.background='#E0F2F1'; }
+    else { cl.readOnly=false; cl.style.background=''; if(cl.value===COMMON_CLIENT){ cl.value=keepClient?'':(cl.dataset.prev||''); } delete cl.dataset.prev; } }
+  if(on&&idx<0){ var code=document.getElementById('m_code'); if(code&&!String(code.value||'').startsWith('G0000-')) code.value=autoMasterCode(undefined,COMMON_CLIENT); }
+  else if(!on&&idx<0){ var code2=document.getElementById('m_code'); if(code2&&String(code2.value||'').startsWith('G0000-')) code2.value=autoMasterCode(undefined,cl?cl.value:''); }
+  // 박스 전용 칸(골·원지·치수·적재·밴딩·잉크)은 공용 품목이면 접음 — 값은 그대로(저장에 지장 없음)
+  var hide=['m_flute','m_paper','m_jeonj','m_rp','m_nalgae','m_jeolsu','m_area','m_pattern','m_pallet_qty','m_pallet_type','m_bonghap','m_holder','m_banding','m_layer','m_ink1','m_ink2','m_ink3','m_ink4'];
+  hide.forEach(function(id){ var e=document.getElementById(id); var d=e&&e.closest('div'); if(d&&d.id!=='modal_master') d.style.display=on?'none':''; });
+  var jg=document.getElementById('m_jang'); var dimBox=jg&&jg.parentElement&&jg.parentElement.parentElement; if(dimBox&&dimBox.id!=='modal_master') dimBox.style.display=on?'none':''; // 치수 3칸 묶음 (style 속성 선택자는 한 번 바꾸면 안 맞아 부모로)
+  var sv=document.getElementById('m_spec_file_input'); var specBox=sv&&sv.closest('div[style*="grid-column"]'); if(specBox) specBox.style.display=on?'none':'';
+}
+function _mCpAddRow(client,price){
+  var host=document.getElementById('m_cp_rows'); if(!host) return;
+  var clients=loadData('clients').filter(function(c){ return c&&c.is_sell&&c.name&&(!c.inactive||c.name===client); });
+  var opts='<option value="">-- 거래처 --</option>'+clients.map(function(c){ return '<option value="'+_ddEsc(c.name)+'"'+(client&&sameClient(c.name,client)?' selected':'')+'>'+_ddEsc(c.alias||c.name)+'</option>'; }).join('');
+  if(client&&!clients.some(function(c){ return sameClient(c.name,client); })) opts+='<option value="'+_ddEsc(client)+'" selected>'+_ddEsc(client)+' (등록 안 됨)</option>';
+  host.insertAdjacentHTML('beforeend','<div class="m-cp-row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px;flex-wrap:wrap"><select class="m-cp-client" style="flex:1 1 160px;min-width:140px;padding:6px;border:1px solid #B2DFDB;border-radius:5px;font-size:12px;background:#fff">'+opts+'</select><input class="m-cp-price" type="number" min="0" step="1" inputmode="numeric" value="'+(price>0?price:'')+'" placeholder="단가(원)" style="flex:1 1 110px;min-width:100px;padding:6px;border:1px solid #B2DFDB;border-radius:5px;font-size:12px;text-align:right"><button type="button" onclick="this.parentNode.remove()" title="이 거래처 단가 빼기" style="padding:6px 9px;background:#fff;color:#B71C1C;border:1px solid #EF9A9A;border-radius:5px;font-size:11px;cursor:pointer">✕</button></div>');
+}
+// 거래처별 단가 읽기 → [{client,price}] · 잘못되면 null (안내 후)
+function _mCpRead(){
+  var out=[], seen={}, bad=null;
+  Array.prototype.forEach.call(document.querySelectorAll('#m_cp_rows .m-cp-row'),function(r){
+    var c=_nm((r.querySelector('.m-cp-client')||{}).value||''), pv=String((r.querySelector('.m-cp-price')||{}).value||'').trim();
+    if(!c&&!pv) return; if(!c){ bad='단가만 있고 거래처를 고르지 않은 줄이 있습니다.'; return; }
+    var pr=Math.round(+pv||0); if(pv&&!(isFinite(+pv)&&pr>=0)){ bad='"'+c+'" 단가가 숫자가 아닙니다.'; return; }
+    if(!(pr>0)) return; var k=canonClient(c); if(seen[k]){ bad='"'+c+'" 거래처가 두 번 있습니다.'; return; } seen[k]=1;
+    out.push({client:c,price:pr});
+  });
+  if(bad){ alert(bad); return null; }
+  return out;
+}
+// ── 거래처별 제품 → 공용 품목으로 묶기 (v2.5.4) ──
+//  같은 품명(앞뒤 공백·대소문자 무시)으로 여러 거래처에 등록된 제품을 골라 공용 품목 하나로: 기본 단가 = 가장 많이 쓰인 판매단가, 거래처별 단가 = 각 거래처의 단가,
+//  매입단가·발주처 = 처음 값. 원래 거래처별 제품은 [사용 중지]로 남겨 지난 기록(단가·출고)은 그대로, 앞으로의 수주·재고는 공용으로 (사용 중지 제품의 재고도 공용 재고로 이어짐)
+function _commonMergeCands(){
+  var groups={}, master=loadData('master');
+  master.forEach(function(m,i){ if(!m||!m.product||m.common||m.inactive) return; var k=_nm(m.product).toLowerCase(); (groups[k]=groups[k]||{name:_nm(m.product),items:[]}).items.push({i:i,m:m}); });
+  return Object.keys(groups).map(function(k){ return groups[k]; }).filter(function(g){ return !_commonMasterOf(g.name); }).sort(function(a,b){ return b.items.length-a.items.length||(a.name<b.name?-1:1); });
+}
+function openCommonMergeModal(){
+  if(typeof canDo==='function'&&!canDo('edit')){ try{ showInfoToast('🔒 편집 권한이 없습니다.','#B71C1C'); }catch(e){} return; }
+  var old=document.getElementById('cmerge_overlay'); if(old) old.remove();
+  var cands=_commonMergeCands(), esc=_ddEsc;
+  var ov=document.createElement('div'); ov.id='cmerge_overlay'; ov.className='dyn-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:10px';
+  var rows=cands.map(function(g,gi){
+    var cl=g.items.map(function(x){ return esc(x.m.client||'?')+' '+(+x.m.price||0).toLocaleString()+'원'; }).join(' · ');
+    return '<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 8px;border-bottom:1px solid #EEE;cursor:pointer;font-size:12px"><input type="checkbox" class="cm-chk" data-gi="'+gi+'"'+(g.items.length>1?' checked':'')+' style="margin-top:2px"><div style="flex:1;min-width:0"><div style="font-weight:700;color:#1A237E">'+esc(g.name)+' <span style="font-weight:400;color:#888">('+g.items.length+'곳)</span></div><div style="font-size:10px;color:#666;line-height:1.5">'+cl+'</div></div><select class="cm-unit" data-gi="'+gi+'" style="padding:4px 6px;border:1px solid #B2DFDB;border-radius:5px;font-size:11px;background:#fff">'+UNIT_OPTIONS.map(function(u){ return '<option value="'+esc(u)+'"'+(u===(/필름|랩|비닐|테이프|박스/.test(g.name)?'박스':(/끈|밴드|밴딩|롤/.test(g.name)?'롤':'매'))?' selected':'')+'>'+esc(u)+'</option>'; }).join('')+'</select></label>';
+  }).join('');
+  ov.innerHTML='<div style="background:#fff;border-radius:12px;padding:18px 20px;width:620px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:14px;font-weight:700;color:#00695C">🧷 거래처별 제품을 공용 품목으로 묶기</div><button onclick="document.getElementById(\'cmerge_overlay\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888">✕</button></div>'
+    +'<div style="font-size:11px;color:#555;background:#F1F8F6;border-radius:6px;padding:7px 10px;margin-bottom:10px;line-height:1.5">같은 품명으로 여러 거래처에 등록된 제품을 공용 품목 하나로 만듭니다. 거래처별 단가는 그대로 옮겨지고, 원래 제품은 <b>사용 중지</b>로 남아 지난 기록은 바뀌지 않습니다. 그 제품의 남은 재고는 공용 재고로 이어집니다. 품명 옆에서 단위(박스·롤 등)를 고르세요. 한 거래처에만 있는 품목도 묶을 수 있습니다(체크).</div>'
+    +(cands.length?'<div style="border:1px solid #E0E0E0;border-radius:8px;max-height:52vh;overflow-y:auto">'+rows+'</div>':'<div style="padding:16px;text-align:center;color:#999;font-size:12px">묶을 수 있는 제품이 없습니다 (이미 공용이거나 사용 중지한 제품은 빠집니다).</div>')
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button onclick="document.getElementById(\'cmerge_overlay\').remove()" style="padding:8px 16px;background:#fff;color:#555;border:1px solid #CCC;border-radius:6px;font-size:12px;cursor:pointer">취소</button>'
+    +(cands.length?'<button onclick="commonMergeApply()" style="padding:8px 18px;background:#00695C;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">체크한 품목 공용으로 묶기</button>':'')+'</div></div>';
+  document.body.appendChild(ov);
+}
+function commonMergeApply(){
+  var cands=_commonMergeCands(), picks=[];
+  Array.prototype.forEach.call(document.querySelectorAll('#cmerge_overlay .cm-chk'),function(cb){ if(!cb.checked) return; var gi=+cb.getAttribute('data-gi'); var g=cands[gi]; if(!g) return; var us=document.querySelector('#cmerge_overlay .cm-unit[data-gi="'+gi+'"]'); picks.push({g:g,unit:(us&&us.value)||'매'}); });
+  if(!picks.length){ alert('묶을 품목을 체크하세요.'); return; }
+  if(!confirm('🧷 '+picks.length+'개 품목을 공용 품목으로 묶습니다.\n\n'+picks.map(function(x){ return ' · '+x.g.name+' ('+x.g.items.length+'곳 · '+x.unit+')'; }).join('\n')+'\n\n원래 거래처별 제품은 사용 중지로 남습니다. 계속할까요?')) return;
+  var master=loadData('master'), made=0;
+  picks.forEach(function(x){
+    var g=x.g, cnt={}, best=0, bestN=-1, buy=0, vendor='', cps=[], safety=0;
+    g.items.forEach(function(it){ var m=it.m, pr=Math.round(+getPriceAt(m,today())||+m.price||0); if(pr>0){ cnt[pr]=(cnt[pr]||0)+1; if(cnt[pr]>bestN){ bestN=cnt[pr]; best=pr; } if(m.client) cps.push({client:m.client,price:pr}); } if(!buy&&(+m.buy_price>0)) buy=Math.round(+m.buy_price); if(!vendor&&m.buy_vendor) vendor=m.buy_vendor; safety+=(+m.safety_stock||0); });
+    var rec={code:autoMasterCode(undefined,COMMON_CLIENT),client:COMMON_CLIENT,product:g.name,common:true,unit:x.unit,price:best,buy_price:buy,buy_vendor:vendor,buy_code:'',safety_stock:safety,clientPrices:cps.filter(function(c){ return c.price!==best; }),priceHistory:best?[{price:best,from:today(),to:null,memo:'공용 품목으로 묶음'}]:[],note:'공용으로 묶음 ('+g.items.map(function(it){ return it.m.client||''; }).join('·')+')',flute:'',paper:'',jang:0,pok:0,go:0};
+    master.push(rec); made++;
+    g.items.forEach(function(it){ var m=master[it.i]; if(m&&m===it.m){ m.inactive=true; m.note=(m.note?m.note+' · ':'')+'→ 공용 품목으로 묶음'; } });
+  });
+  if(saveData('master',master)===false) return;
+  var ov=document.getElementById('cmerge_overlay'); if(ov) ov.remove();
+  try{ selectMasterClient(COMMON_CLIENT); }catch(e){ renderMaster(); }
+  try{ showInfoToast('🧷 공용 품목 '+made+'개를 만들었습니다. 거래처별 단가는 [수정]에서 확인·고칠 수 있습니다.','#00695C',{ms:9000}); }catch(e){}
+}
 function openMasterModal(idx=-1){
   if(idx>=0&&!_okRec(loadData('master')[idx])){ alert('이 제품은 내용이 없는 빈 기록입니다 (동기화 중 깨진 줄).\n🩺 데이터 검진의 「빈 기록」 [정리]로 지울 수 있습니다.'); return; } // (R2-14)
   var _oldHint=document.getElementById('qt_import_hint'); if(_oldHint) _oldHint.remove();
@@ -13190,7 +13325,8 @@ function openMasterModal(idx=-1){
     [1,2,3,4].forEach(function(n){updateInkSwatch(n);});
     // 거래처 설정
     const clientInput=document.getElementById('m_client');
-    if(clientInput) clientInput.value=(selMasterClient&&selMasterClient!=='__none__')?selMasterClient:'';
+    if(clientInput) clientInput.value=(selMasterClient&&selMasterClient!=='__none__'&&selMasterClient!==COMMON_CLIENT)?selMasterClient:'';
+    _mCommonFill({common:selMasterClient===COMMON_CLIENT,unit:'매',clientPrices:[]}); // 공용 품목 (v2.5.4): 왼쪽에서 공용을 골랐으면 공용으로
     document.getElementById('m_spec_data').value=''; document.getElementById('m_spec_data').dataset.state=''; window._specFormToken=(window._specFormToken||0)+1;
     document.getElementById('m_spec_filename').textContent='선택된 파일 없음';
     document.getElementById('m_spec_remove_btn').style.display='none';
@@ -13222,6 +13358,7 @@ function openMasterModal(idx=-1){
     document.getElementById('m_buy_price').value=m.buy_price||'';
     { var _bb=document.getElementById('m_buy_change_box'); if(_bb){ _bb.dataset.origBuy=String(+m.buy_price||0); _bb.style.display='none'; var _bf=document.getElementById('m_buy_price_from'); if(_bf) _bf.value=today(); } try{ _mMarginHint(); }catch(e){} } // 매입단가 소급 (v2.5.1)
     document.getElementById('m_note').value=m.note||'';
+    _mCommonFill(m); // 공용 품목·단위·거래처별 단가 (v2.5.4)
     var _ssEl=document.getElementById('m_safety_stock'); if(_ssEl) _ssEl.value=(+m.safety_stock||0)>0?+m.safety_stock:'';
     var _tiE=document.getElementById('m_tools_info'); if(_tiE){ try{ _tiE.innerHTML=(typeof _masterToolsInfoHtml==='function')?_masterToolsInfoHtml(m):'-'; }catch(e){ _tiE.textContent='-'; } }
     document.getElementById('m_bonghap').value=m.bonghap||'없음';
@@ -13450,6 +13587,12 @@ function saveMaster(){
     ink4:document.getElementById('m_ink4').value
   };
   if(!data.product){alert('품명은 필수입니다');return;}
+  // 공용 품목·단위 (v2.5.4)
+  { var _cmChk=!!((document.getElementById('m_common')||{}).checked), _u=String(((document.getElementById('m_unit')||{}).value)||'매').trim();
+    data.unit=_u||'매'; data.common=_cmChk;
+    if(_cmChk){ data.client=COMMON_CLIENT; data.clientPrices=_mCpRead(); if(data.clientPrices===null) return; }
+    else data.clientPrices=[];
+    if(_cmChk&&!data.price&&!data.clientPrices.length){ alert('공용 품목은 기본 판매단가나 거래처별 단가 가운데 하나는 있어야 합니다.'); return; } }
   // 단가·수량 칸은 0 이상 숫자 (A7-09: 판매단가 -600 이 단가 이력에 남던 것)
   //  판매·매입단가는 원 단위 정수만 (R1-13·R3-07 — 523.5원이면 금액에 0.5원이 붙어 화면마다 1원씩 달랐음)
   { var _mv=[['m_price','판매단가',1],['m_buy_price','매입단가',1],['m_safety_stock','안전재고'],['m_pallet_qty','1파렛트 수량'],['m_banding','밴딩수'],['m_layer','단수'],['m_jang','장'],['m_pok','폭'],['m_go','고']];
@@ -13462,7 +13605,8 @@ function saveMaster(){
   // 거래처: 거래처등록에 있는 이름이어야 함 (관리상호·오타로 적으면 없는 거래처의 제품이 되어 수주 창 품명 목록에 나오지 않음)
   data.client=_nm(data.client);
   if(idx===-1&&!data.client){ alert('거래처를 입력하세요 (거래처등록에 있는 매출처 이름 — 목록에서 고를 수 있습니다).'); return; }
-  if(data.client&&!findClient(data.client)){
+  if(data.common&&idx===-1&&!String(data.code||'').startsWith('G0000-')) data.code=autoMasterCode(undefined,COMMON_CLIENT); // 공용 관리번호 (v2.5.4)
+  if(data.client&&!data.common&&!findClient(data.client)){
     var _ac=loadData('clients').filter(function(c){ return c&&_nm(c.alias)===data.client; });
     if(_ac.length===1){
       if(!confirm('"'+data.client+'"은(는) 거래처 "'+_ac[0].name+'"의 관리상호입니다.\n그 거래처의 제품으로 저장할까요?\n\n[취소]를 누르면 저장하지 않고 창으로 돌아갑니다.')) return;
@@ -14576,7 +14720,7 @@ function buildInventoryRows(){
   var td=today(), tdD=parseYmd(td), longDays=invLongDays(), I=getIdx();
   var map={};
   // 지금 이름으로 묶음 — 거래처는 canonClient, 품명은 그 제품의 지금 품명 (이름을 바꾸기 전 입고·출고도 같은 줄에)
-  function canon(c,p){ var cc=canonClient(c), m=findMasterRec(cc,p,true); return {c:cc,p:m?_nm(m.product):_nm(p),m:m}; }
+  function canon(c,p){ var cc=canonClient(c), m=findMasterRec(cc,p,true); if(m&&m.common) return {c:COMMON_CLIENT,p:_nm(m.product),m:m}; return {c:cc,p:m?_nm(m.product):_nm(p),m:m}; } // 공용 품목은 '(공용)' 한 줄 (v2.5.4)
   function key(c,p){ return (c||'')+'‖'+(p||''); }
   function ensure(c0,p0){ var cp=canon(c0,p0), c=cp.c, p=cp.p, k=key(c,p); if(!map[k]) map[k]={key:k,client:c||'',product:p||'',inStock:0,pending:0,unordered:0,orderRemain:0,restocked:0,lots:[],outs:[],safety:0,unitPrice:0,stockAmt:0,buyPrice:0,saleAmt:0,_m:cp.m}; return map[k]; }
   stocks.forEach(function(s,i){
@@ -14811,7 +14955,7 @@ function renderInventory(){
     h+='<tr style="background:'+bg+'" class="inv-row">'
       +'<td style="padding:6px 4px;text-align:center">'+(hasLots?'<button onclick="invToggleLots('+i+')" id="inv_tg_'+i+'" title="선입선출 로트 보기" style="background:none;border:1px solid #B2DFDB;border-radius:4px;color:#00695C;cursor:pointer;font-size:11px;padding:2px 6px">▸</button>':'')+'</td>'
       +'<td style="padding:8px 10px;font-size:12px;color:#555">'+invEsc(r.client)+'</td>'
-      +'<td style="padding:8px 10px;font-size:12px;font-weight:600;color:#1A237E">'+invEsc(r.product)+(r.masterCode?'<div style="font-size:9px;color:#999;font-weight:400;font-family:monospace">'+invEsc(r.masterCode)+'</div>':'')+'</td>'
+      +'<td style="padding:8px 10px;font-size:12px;font-weight:600;color:#1A237E">'+invEsc(r.product)+((r.master&&r.master.common)?' <span style="font-size:9px;font-weight:700;background:#E0F2F1;color:#00695C;border:1px solid #80CBC4;border-radius:8px;padding:0 5px">🧷 공용 · '+invEsc(r.master.unit||'매')+'</span>':'')+(r.masterCode?'<div style="font-size:9px;color:#999;font-weight:400;font-family:monospace">'+invEsc(r.masterCode)+'</div>':'')+'</td>'
       +'<td style="padding:8px 10px;font-size:13px;font-weight:700;color:'+(r.inStock>0?(r.shortSafety?'#C62828':'#1B5E20'):'#bbb')+';text-align:right;white-space:nowrap">'+(r.inStock>0?r.inStock.toLocaleString()+' 매':'-')
         // 📐 재고 조정 (v2.5.1) — 현재고 옆 작은 버튼: 실사 수량과 다르면 차이를 조정 (재고 수량만 — 매입원장·손익은 그대로)
         +' <button onclick="invOpenAdj('+i+')" title="재고 조정 — 세어 본 수량과 다르면 차이를 조정 (재고 수량만 · 매입원장·손익은 그대로)" style="padding:1px 5px;background:#ECEFF1;color:#37474F;border:1px solid #B0BEC5;border-radius:4px;font-size:10px;cursor:pointer;vertical-align:middle;min-height:22px">📐</button></td>'
@@ -19322,6 +19466,7 @@ function _oInitOrderPrice(){
 // 품명을 고를 때 단가 안내도 같이 — fillOrderFromProduct 몸통은 바꾸지 않고 감쌈
 try{ (function(){ var _f=fillOrderFromProduct; if(typeof _f==='function'&&!_f.__o){ var w=function(){ var r=_f.apply(this,arguments); try{ _oUnitPriceHint(); }catch(e){} return r; }; w.__o=1; fillOrderFromProduct=w; } })(); }catch(e){}
 // 수주 엑셀 다운로드·업로드에 '단가(이번 수주)' 열 (맨 끝 — 기존 열 위치 그대로 · 파일에 그 열이 있을 때만 반영됨) · 변경이력 칸 이름
+try{ if(typeof EXCEL_COLS==='object'&&EXCEL_COLS.master&&!EXCEL_COLS.master.some(function(c){ return c.k==='unit'; })){ EXCEL_COLS.master.push({h:'단위',k:'unit'}); if(typeof EXCEL_TYPES==='object'&&EXCEL_TYPES.master) EXCEL_TYPES.master.unit='s'; } }catch(e){} // 단위 열 (v2.5.4)
 try{ if(typeof EXCEL_COLS==='object'&&EXCEL_COLS.orders&&!EXCEL_COLS.orders.some(function(c){ return c.k==='unitPrice'; })) EXCEL_COLS.orders.push({h:'단가(이번 수주)',k:'unitPrice'}); if(typeof EXCEL_TYPES==='object'&&EXCEL_TYPES.orders) EXCEL_TYPES.orders.unitPrice='n'; }catch(e){}
 try{ if(typeof REC_FIELD_KO_BY==='object'&&REC_FIELD_KO_BY){ REC_FIELD_KO_BY.orders=REC_FIELD_KO_BY.orders||{}; REC_FIELD_KO_BY.orders.unitPrice='단가(이번 수주)'; } }catch(e){}
 
@@ -24851,7 +24996,7 @@ var HELP_TABS={
     m:['↩ 는 그 줄의 출고 한 번만 취소합니다. 모자라게 나가고 끝났으면 [✂️ 잔량 마감].','🔒 가 붙은 줄은 마감한 달의 출고입니다 — 고치려면 마감관리에서 그 달 [마감취소]가 먼저입니다.'],
     b:[['📷 QR 출고','qr']]},
   tab_master:{t:'🏢 제품마스터',d:'거래처별 제품(품명·치수·원지·판매단가·발주처·매입단가·적재)을 등록합니다. 수주 창의 품명 목록이 여기서 나옵니다.',
-    s:['왼쪽(폰은 위쪽)에서 거래처를 고르고 [+ 제품 등록] → 저장.','단가가 바뀌면 [수정](적용 시작일) 또는 [📅예약](앞으로 바뀔 단가). [📈이력]으로 지난 단가를 봅니다.','거래처에 보낼 단가표는 [📄 단가표] — 품명·규격·현재 단가·적용일·예정 단가가 한 장으로(인쇄·그림으로 저장).'],
+    s:['왼쪽(폰은 위쪽)에서 거래처를 고르고 [+ 제품 등록] → 저장.','🧷 공용 품목: 스트레치필름·밴딩끈처럼 모든 거래처에 파는 품목은 왼쪽 "🧷 공용 품목"을 고르고 [+ 제품 등록](창의 "공용 품목" 체크). 단위(박스·롤 등)와 기본 판매단가를 넣고, 다르게 받는 거래처는 "거래처별 단가"에 추가. 어느 거래처의 수주·출고에서도 품명 목록 끝에 [공용]으로 나오고, 재고는 하나로 묶여 재고용 발주([거래처]에서 "(공용)")로 채우고 어느 거래처로든 "재고에서 출고"합니다.','이미 거래처마다 따로 등록한 랩·밴딩끈은 [🧷 공용으로 묶기]로 한 번에 — 거래처별 단가는 옮겨지고 원래 제품은 사용 중지로 남으며 그 재고는 공용 재고로 이어집니다.','단가가 바뀌면 [수정](적용 시작일) 또는 [📅예약](앞으로 바뀔 단가). [📈이력]으로 지난 단가를 봅니다.','거래처에 보낼 단가표는 [📄 단가표] — 품명·규격·현재 단가·적용일·예정 단가가 한 장으로(인쇄·그림으로 저장).'],
     m:['판매단가·매입단가를 넣으면 그 아래에 마진(원·%)이 보이고 5% 이하면 빨갛게 ⚠️ 표시됩니다.','단가를 지난 날짜부터 바꾸면 이미 출고한 건도 바꿀지 묻습니다(마감한 달은 그대로).','매입단가를 바꾸면 적용 시작일을 묻고, 그 날짜 이후 이미 입고한 건의 매입단가도 바꿀지 묻습니다 — 바꾸면 매입원장과 그 수주로 나간 출고의 원가(손익)가 함께 바뀝니다(마감한 달은 그대로). 발주처 단가가 소급 인상·인하될 때 쓰세요.','품명을 바꾸면 지난 기록은 옛 품명 그대로 남습니다(확인창). 안 쓰는 제품은 지우지 말고 [사용 중지].'],
     b:[['+ 제품 등록','master_new']]},
   tab_client:{t:'🏬 거래처등록',d:'파는 곳(매출처)과 사는 곳(발주처)을 등록합니다 — 상호·사업자번호·결제조건·여신 한도·세금계산서 발행 대상·납품처.',
@@ -24928,7 +25073,7 @@ var HELP_FIX=[
   {k:'relogin',t:'로그인 화면에 "로그인 유지 기한이 지나…" · "접속을 끊었습니다"가 떠요',s:['👥 팀 창의 "로그인 유지 기한"(기본 30일)이 지났거나 소유자·관리자가 그 기기의 [접속 끊기]를 누른 것입니다 — 그냥 다시 로그인하면 됩니다. 자료는 그대로이고 올라가지 않았던 변경도 이어서 올라갑니다.','기한이 번거로우면 소유자가 👥 팀 창에서 "없음"으로 바꿀 수 있습니다.'],b:[['👥 팀·로그인','team']]}
 ];
 // 이번 판에서 바뀐 점 (README ⑩ v2.5.0 간추림)
-var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억) · 제품마스터 매입단가를 바꿀 때 이미 입고한 건(열린 달)에도 소급할지 묻기.','v2.5.2: 거래처 수금조건에 마감후 30일·40일·45일 추가 (수금예정일 = 그 달 말일 + N일).','v2.5.3: 손익분석 🏠 월 고정비(월세·차량 등) → 홈·손익분석·차트·목표의 영업이익이 고정비까지 뺀 값으로 · 수주 창·제품마스터 창에 마진 표시, 5% 이하면 ⚠️(저장 뒤 빨간 안내) · 홈 💵 자금 흐름 카드(이달·다음달 받을 돈·줄 돈·고정비·차이, 매입 결제조건).'];
+var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억) · 제품마스터 매입단가를 바꿀 때 이미 입고한 건(열린 달)에도 소급할지 묻기.','v2.5.2: 거래처 수금조건에 마감후 30일·40일·45일 추가 (수금예정일 = 그 달 말일 + N일).','v2.5.3: 손익분석 🏠 월 고정비(월세·차량 등) → 홈·손익분석·차트·목표의 영업이익이 고정비까지 뺀 값으로 · 수주 창·제품마스터 창에 마진 표시, 5% 이하면 ⚠️(저장 뒤 빨간 안내) · 홈 💵 자금 흐름 카드(이달·다음달 받을 돈·줄 돈·고정비·차이, 매입 결제조건).','v2.5.4: 🧷 공용 품목 — 스트레치필름·밴딩끈처럼 모든 거래처에 파는 품목을 제품마스터에 한 번만 등록(단위 박스·롤 등 · 거래처별 단가 · 재고 하나) · 수주 창 품명 목록에 [공용] · 재고용 발주에 "(공용)" · 거래명세표·발주서·수주 목록에 단위 표시 · [공용으로 묶기].'];
 // 도움말 버튼이 부르는 동작 (버튼에는 키만 — 이름·자료는 넣지 않음)
 function _hCan(act){ try{ return typeof canDo==='function'?canDo(act)!==false:true; }catch(e){ return true; } }
 function _hNoEdit(){ try{ showInfoToast('🔒 보기 전용 권한이라 입력 창을 열 수 없습니다.','#B71C1C'); }catch(e){} }
@@ -26633,7 +26778,7 @@ var PERM_HIDE={
   admin:['executeClosing(','cancelClosing(','bulkCancelOrders(','bulkDeletePOs(','emptyTrash(','bulkDeletePayment(','bulkDeleteDetail(','triggerExcelUpload(','_excelUndo(','restoreLocalSnapshot(','restoreCloudSnapshot(','restore_file_input'],
   edit:['openOrderModal(','deleteOrder(','orderCloseRemain(','orderReopenRemain(','openOrderDueDestModal(',
     'printPO(','openPOModal(','cancelPO(','bulkCancelPOs(','deletePOLine(','openStockPOModal(','invOpenStockPO(','openPoLinkChooser(',
-    'completeStock(','completeStockBulk(','cancelStock(','bulkCancelStocks(','editStockQty(','addStockQty(','closeStockRemain(','reopenStockRemain(','invOpenAdj(','openStockAdjModal(',
+    'completeStock(','completeStockBulk(','cancelStock(','bulkCancelStocks(','editStockQty(','addStockQty(','closeStockRemain(','reopenStockRemain(','invOpenAdj(','openStockAdjModal(','openCommonMergeModal(',
     'deliveryOutOne(','deliveryOutBulk(','deliveryCancelOne(','bulkCancelDeliveries(','editDeliveryBulk(','openQrScanner(',
     'openMasterModal(','toggleMasterActive(','openMasterMove(','bulkCalcMasterDims(','copyMasterSelected(','cancelPriceReserve(',
     'openClientModal(','toggleClientActive(','applyDefaultTermsToAll(','deleteDestInline(','saveNewDest(',
@@ -27298,7 +27443,7 @@ function runDataHealth(){
   // 거래처를 이름·예전 이름(aliases)으로 찾음 (findClient) — 이름을 바꾼 거래처의 지난 기록은 '없는 거래처'가 아님
   orders.forEach(function(o){ if(o.client&&!findClient(o.client)) (missC[o.client]=missC[o.client]||{n:0,src:{}}).n++, missC[o.client].src['수주']=1; });
   deliveries.forEach(function(d){ if(d.client&&!findClient(d.client)) (missC[d.client]=missC[d.client]||{n:0,src:{}}).n++, missC[d.client].src['출고']=1; });
-  master.forEach(function(m){ if(m.client&&!findClient(m.client)) (missC[m.client]=missC[m.client]||{n:0,src:{}}).n++, missC[m.client].src['마스터']=1; });
+  master.forEach(function(m){ if(m.client&&!m.common&&!findClient(m.client)) (missC[m.client]=missC[m.client]||{n:0,src:{}}).n++, missC[m.client].src['마스터']=1; }); // 공용 품목의 '(공용)'은 거래처가 아님 (v2.5.4)
   add('client_missing','err','거래처 목록에 없는 거래처명','수주·출고·제품마스터에 쓰인 거래처가 거래처등록에 없습니다. 미수금·명세서·결제조건 계산에서 빠질 수 있습니다.',
     Object.keys(missC).map(function(n){ var lk=null; try{ lk=_r2AliasCand(n,clients); }catch(e){} return {label:n+' ('+Object.keys(missC[n].src).join('·')+' '+missC[n].n+'건)'+(lk?' — 거래처 「'+lk.c.name+'」의 예전 이름으로 보임 ('+lk.why+')':''),go:{tab:'tab_client',search:n},fix:lk?{type:'linkAlias',name:n,cid:lk.c._id}:{type:'addClient',name:n},fixLabel:lk?'예전 이름으로 잇기':''}; }),'거래처 등록'); // 예전 이름이 지워진 거래처면 [예전 이름으로 잇기]를 먼저 (R2-18)
   // 2. 마스터 없는 품목 (수주 기준)
@@ -27388,7 +27533,7 @@ function runDataHealth(){
     stocks.filter(function(s){ return s.status==='미입고'&&!((+s.qty||0)>0); }).map(function(s){ return {label:(s.client||'')+' · '+(s.product||'')+' — 미입고 '+(+s.qty||0).toLocaleString()+'매 (수주 '+(s.fromOrder||'-')+')',go:{tab:'tab_stock',search:s.fromOrder||s.product}}; }));
   // 9. 마스터 정보 미완성 (단가 0 · 치수 없음)
   add('master_incomplete','info','제품마스터 정보 미완성 (단가 0 또는 치수 없음)','단가가 없으면 매출·미수금이 0으로, 치수가 없으면 원가·인상 영향표 계산이 빠집니다.',
-    master.filter(function(m){ return !(+m.price>0)||!(m.jang&&m.pok&&m.go); }).map(function(m){ return {label:(m.code||'')+' '+(m.client||'')+' · '+(m.product||'')+' — '+(!(+m.price>0)?'단가 없음 ':'')+(!(m.jang&&m.pok&&m.go)?'치수 없음':''),go:{tab:'tab_master',search:m.code||m.product}}; }));
+    master.filter(function(m){ if(m.inactive) return false; if(m.common) return !(+m.price>0)&&!(Array.isArray(m.clientPrices)&&m.clientPrices.length); return !(+m.price>0)||!(m.jang&&m.pok&&m.go); }).map(function(m){ return {label:(m.code||'')+' '+(m.client||'')+' · '+(m.product||'')+' — '+(!(+m.price>0)?'단가 없음 ':'')+((!m.common&&!(m.jang&&m.pok&&m.go))?'치수 없음':''),go:{tab:'tab_master',search:m.code||m.product}}; })); // 공용 품목은 치수 없어도 됨 (v2.5.4)
   // 10. 날짜 형식 오류
   var badDates=[], numDate=false;
   [['orders','date','수주'],['orders','due','수주 납기'],['pos','date','발주'],['deliveries','date','출고'],['stocks','date','입고']].forEach(function(spec){
