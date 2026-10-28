@@ -569,6 +569,10 @@ body.local-mode .main-panel{padding-bottom:44px!important} /* 하단 로컬모�
   .gs-mob-btn{display:inline-block!important}
 }
 #ar_tbody tr:not([id]) td,#ar_tfoot td{white-space:nowrap}
+#ar2_tbody tr:not([id]) td,#ar2_tfoot td{white-space:nowrap}
+#ar2_tbody tr:not([id]) td:first-child{white-space:normal;min-width:190px}
+#ar2_thead .ar2-sub,#ar2_tbody .ar2-sub,#ar2_tfoot .ar2-sub{display:block;font-size:10px;font-weight:400;color:#888;line-height:1.35}
+#ar2_tbody .ar2-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:#ECEFF1;min-width:84px}
 /* 표 헤더는 글자 단위로 줄바꿈되지 않게 */
 #tab_master table th,#tab_order table th,#tab_po table th,#tab_stock table th,#tab_delivery table th,#tab_ledger table th,#tab_purledger table th,#tab_collection table th,#tab_inventory table th,#tab_returns table th{white-space:nowrap}
 /* 대시보드 카드 그리드 */
@@ -1980,7 +1984,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.5.5</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.5.6</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -3255,7 +3259,8 @@ if(fbReady){
     <!-- 연체 연령 분석 (수금예정일 기준) -->
     <div style="background:#fff;border:1px solid #EF9A9A;border-radius:10px;margin-bottom:14px;overflow:hidden">
       <div style="background:#B71C1C;color:#fff;padding:10px 16px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-        <span>⏰ 연체 현황 — 수금예정일 기준 <span id="ar_asof" style="font-weight:400;font-size:11px;opacity:0.85"></span></span>
+        <span><span id="ar_title">📅 받을 돈 — 언제 받나</span> <span id="ar_asof" style="font-weight:400;font-size:11px;opacity:0.85"></span>
+          <span id="ar_view_bar" style="display:inline-flex;gap:4px;margin-left:10px;vertical-align:middle"><button type="button" id="ar_view_when" onclick="setArView('when')" style="padding:3px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.7);background:#fff;color:#B71C1C;font-size:11px;font-weight:700;cursor:pointer">📅 달별</button><button type="button" id="ar_view_age" onclick="setArView('age')" style="padding:3px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.7);background:transparent;color:#fff;font-size:11px;font-weight:700;cursor:pointer">⏱ 늦은 일수</button></span></span>
         <span id="ar_default_terms_wrap" style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:400;flex-wrap:wrap">
           <span>기본 결제조건</span>
           <select id="ar_default_terms" onchange="setDefaultPaymentTerms(this.value)" style="padding:4px 8px;border:1px solid rgba(255,255,255,0.5);border-radius:5px;font-size:11px;background:#fff;color:#333">
@@ -3265,7 +3270,15 @@ if(fbReady){
         </span>
       </div>
       <div id="ar_kpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;padding:12px 14px 4px"></div>
-      <div style="overflow-x:auto;padding:8px 0 4px">
+      <!-- 📅 언제 받나 (달별) — v2.5.6 · 칸(달)은 오늘 날짜에 따라 저절로 정해짐 -->
+      <div id="ar_when_wrap" style="overflow-x:auto;padding:8px 0 4px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">
+          <thead id="ar2_thead"></thead>
+          <tbody id="ar2_tbody"></tbody>
+          <tfoot id="ar2_tfoot"></tfoot>
+        </table>
+      </div>
+      <div id="ar_age_wrap" style="overflow-x:auto;padding:8px 0 4px;display:none">
         <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">
           <thead>
             <tr style="background:#FFEBEE;color:#B71C1C">
@@ -17636,12 +17649,107 @@ function calcArAging(asOf, clientFilter){
   res.credits.sort(function(a,b){ return b.advance-a.advance; });
   return res;
 }
+// ── 📅 언제 받나 (달별) — v2.5.6 ──
+//  수금관리 위쪽 표를 "받을 날이 어느 달인가"로 나눔: 늦은 돈(받을 날 지남) | 이달(남은 날) | 다음 달 | … (최대 4달) | 그 뒤 | 총 받을 돈.
+//  칸 안에 "9월분 · 11/09"처럼 어느 달 매출이 언제 받을 돈인지 작게. 계산은 calcArAging 그대로(수금예정일·거래처 잔액), 나누는 기준만 다름.
+//  [⏱ 늦은 일수] 버튼으로 예전 표(미도래·1~30일…)도 그대로 볼 수 있음 — 선택은 이 기기에 기억(localStorage ar_view)
+function arView(){ try{ return localStorage.getItem('ar_view')==='age'?'age':'when'; }catch(e){ return 'when'; } }
+function setArView(v){
+  try{ localStorage.setItem('ar_view',v==='age'?'age':'when'); }catch(e){}
+  var cs=document.getElementById('col_client'); renderArAging(cs?cs.value:'');
+}
+function _arViewApply(v){
+  var w1=document.getElementById('ar_when_wrap'), w2=document.getElementById('ar_age_wrap'), t=document.getElementById('ar_title');
+  if(w1) w1.style.display=v==='when'?'':'none'; if(w2) w2.style.display=v==='when'?'none':'';
+  if(t) t.textContent=v==='when'?'📅 받을 돈 — 언제 받나':'⏰ 연체 현황 — 수금예정일 기준';
+  var b1=document.getElementById('ar_view_when'), b2=document.getElementById('ar_view_age');
+  var base='padding:3px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.7);font-size:11px;font-weight:700;cursor:pointer;', on='background:#fff;color:#B71C1C', off='background:transparent;color:#fff';
+  if(b1) b1.style.cssText=base+(v==='when'?on:off);
+  if(b2) b2.style.cssText=base+(v==='age'?on:off);
+}
+// 칸 나누기: 오늘 기준 · 받을 날이 지난 것은 '늦은 돈', 나머지는 받을 날의 달(이달부터 최대 4달), 그 뒤는 '그 뒤'
+function _arWhenCols(r){
+  var td=today(), curYm=td.slice(0,7), maxYm=curYm;
+  r.list.forEach(function(c){ c.items.forEach(function(it){ if(it.days<=0&&it.due>maxYm) maxYm=String(it.due).slice(0,7); }); });
+  var months=[], ym=curYm;
+  for(var i=0;i<4&&ym<=maxYm;i++){ months.push(ym); ym=addMonths(ym,1); }
+  var later=maxYm>months[months.length-1];
+  var lab=function(ym,i){ var y=+ym.slice(0,4), m=+ym.slice(5,7), ld=new Date(y,m,0).getDate(); var range=i===0?(td.slice(5).replace('-','/')+'~'+m+'/'+ld):(m+'/1~'+m+'/'+ld); return {ym:ym,title:(y!==+td.slice(0,4)?y+'년 ':'')+m+'월'+(i===0?' (남은 날)':''),range:range}; };
+  var cols=[{key:'late',title:'늦은 돈',range:'받을 날 지남',color:'#C62828'}];
+  var palette=['#2E7D32','#1565C0','#6A1B9A','#4E342E'];
+  months.forEach(function(m,i){ var l=lab(m,i); cols.push({key:m,title:l.title,range:l.range,color:palette[i]||'#4E342E'}); });
+  if(later){ var nx=addMonths(months[months.length-1],1); cols.push({key:'later',title:'그 뒤',range:(+nx.slice(5,7))+'월 이후',color:'#546E7A'}); }
+  return cols;
+}
+function _arWhenKey(it,cols){
+  if(it.days>0) return 'late';
+  var ym=String(it.due).slice(0,7);
+  for(var i=1;i<cols.length;i++){ if(cols[i].key===ym) return ym; }
+  return cols[cols.length-1].key==='later'?'later':cols[cols.length-1].key;
+}
+function _arDetailHtml(c){
+  var won=function(n){ return Math.round(n).toLocaleString()+'원'; }, colors=['#1565C0','#F9A825','#EF6C00','#C62828','#4A148C'];
+  return c.items.map(function(it){ return '<div style="display:flex;gap:12px;font-size:11px;padding:3px 0;border-bottom:1px dashed #EEE"><span style="width:64px;color:#555">'+_ddEsc(it.ym)+'</span><span style="width:110px;color:#777">예정 '+_ddEsc(it.due)+'</span><span style="width:70px;font-weight:700;color:'+(it.days>0?colors[Math.min(4,it.days<=30?1:it.days<=60?2:it.days<=90?3:4)]:'#1565C0')+'">'+_ddEsc(it.days>0?it.days+'일 늦음':(it.days===0?'오늘':(-it.days)+'일 뒤'))+'</span><span style="flex:1;text-align:right;min-width:0;white-space:normal">청구 '+won(it.billed)+' · 수금 '+won(it.paid)+(it.creditIn?' · 다른 달 초과분 '+won(it.creditIn):'')+' · <b style="color:#C62828">잔액 '+won(it.remain)+'</b></span></div>'; }).join('');
+}
+function _arWhenRender(r,clientFilter){
+  var thead=document.getElementById('ar2_thead'), tbody=document.getElementById('ar2_tbody'), tfoot=document.getElementById('ar2_tfoot'), kpi=document.getElementById('ar_kpi'); if(!tbody) return;
+  var won=function(n){ return Math.round(n).toLocaleString()+'원'; }, cols=_arWhenCols(r), td=today();
+  var mon=function(ym){ return (+String(ym).slice(5,7))+'월분'; }, md=function(d){ return String(d).slice(5).replace('-','/'); };
+  // 거래처·칸 합계
+  var rows=r.list.map(function(c){
+    var cells={}; cols.forEach(function(k){ cells[k.key]={sum:0,items:[]}; });
+    c.items.forEach(function(it){ var k=_arWhenKey(it,cols); cells[k].sum+=it.remain; cells[k].items.push(it); });
+    return {c:c,cells:cells};
+  });
+  var tot={}; cols.forEach(function(k){ tot[k.key]=0; }); rows.forEach(function(x){ cols.forEach(function(k){ tot[k.key]+=x.cells[k.key].sum; }); });
+  // 위 카드: 총 받을 돈 · 늦은 돈 · 이달 · 다음 달 · 그 뒤 합
+  var m1=cols[1], m2=cols[2], rest=0; cols.slice(3).forEach(function(k){ rest+=tot[k.key]; });
+  if(kpi) kpi.innerHTML=[
+    {l:'총 받을 돈',v:won(r.total),s:r.credit>0?'선수금 '+won(r.credit)+' 별도':'',c:'#1A237E',bg:'#E8EAF6'},
+    {l:'늦은 돈 (받을 날 지남)',v:won(r.overdue),s:(r.maxDays>0?'가장 늦은 것 '+r.maxDays+'일':'없음')+(r.list.length?' · '+r.list.length+'개 거래처 미수':''),c:r.overdue>0?'#C62828':'#2E7D32',bg:r.overdue>0?'#FFEBEE':'#E8F5E9'}
+  ].concat(m1?[{l:m1.title+' 받을 돈',v:won(tot[m1.key]),s:m1.range,c:'#2E7D32',bg:'#E8F5E9'}]:[]).concat(m2?[{l:m2.title+' 받을 돈',v:won(tot[m2.key]),s:m2.range,c:'#1565C0',bg:'#E3F2FD'}]:[]).concat(cols.length>3?[{l:'그 뒤 ('+cols[3].title.replace(' (남은 날)','')+'~)',v:won(rest),c:'#6A1B9A',bg:'#F3E5F5'}]:[])
+    .concat(r.credit>0?[{l:'선수금 (더 받은 돈)',v:won(r.credit),s:r.credits.length+'개 거래처 · 다음 청구에서 빠짐',c:'#00695C',bg:'#E0F2F1'}]:[])
+    .map(function(t){ return '<div style="background:'+t.bg+';border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:#666;font-weight:700">'+t.l+'</div><div style="font-size:18px;font-weight:800;color:'+t.c+';font-variant-numeric:tabular-nums;white-space:nowrap">'+t.v+'</div>'+(t.s?'<div style="font-size:10px;color:#888;margin-top:2px">'+t.s+'</div>':'')+'</div>'; }).join('');
+  // 머리글
+  var TH='padding:8px 8px;border-bottom:1px solid #EF9A9A;white-space:nowrap';
+  if(thead) thead.innerHTML='<tr style="background:#FFEBEE;color:#B71C1C"><th style="'+TH+';text-align:left">거래처</th><th style="'+TH+';text-align:center">조건</th>'
+    +cols.map(function(k){ return '<th data-lb="'+_ddEsc(k.title)+'" style="'+TH+';text-align:right;color:'+k.color+'">'+_ddEsc(k.title)+'<span class="ar2-sub" style="color:#999">'+_ddEsc(k.range)+'</span></th>'; }).join('')
+    +'<th style="'+TH+';text-align:right">총 받을 돈</th><th style="'+TH+';text-align:left;width:1%">언제 받나</th><th style="'+TH+';text-align:center;width:1%">관리</th></tr>';
+  var creditLine=r.credits.length?'<tr><td colspan="'+(cols.length+5)+'" style="padding:6px 12px;font-size:11px;color:#00695C;background:#F1FBF9">💙 선수금(더 받은 돈): '+r.credits.map(function(x){ return '<span data-client="'+_ddEsc(x.client)+'" onclick="openClientLedger(this.getAttribute(\'data-client\'))" style="cursor:pointer;text-decoration:underline">'+_ddEsc(x.client)+'</span> '+won(x.advance); }).join(' · ')+' — 다음 청구에서 먼저 빠집니다</td></tr>':'';
+  if(!rows.length){ tbody.innerHTML='<tr><td colspan="'+(cols.length+5)+'" style="text-align:center;padding:18px;color:#999">받을 돈이 없습니다 🎉</td></tr>'+creditLine; if(tfoot) tfoot.innerHTML=''; return; }
+  tbody.innerHTML=rows.map(function(x,idx){
+    var c=x.c;
+    return safeRowHtml(function(){
+      var bar='<div class="ar2-bar">'+cols.map(function(k){ var b=x.cells[k.key].sum, w=c.total>0?Math.round(b/c.total*100):0; return w?'<div title="'+_ddEsc(k.title)+' '+won(b)+'" style="width:'+w+'%;background:'+k.color+'"></div>':''; }).join('')+'</div>';
+      var rowBg=c.overdue>0?'#FFF8F8':'#fff';
+      var cellHtml=cols.map(function(k){
+        var cell=x.cells[k.key]; if(!cell.sum) return '<td style="padding:8px 8px;text-align:right;color:#CCC">-</td>';
+        var its=cell.items.slice().sort(function(a,b){ return a.due<b.due?-1:1; });
+        var lines=its.slice(0,3).map(function(it){ return '<span class="ar2-sub">'+_ddEsc(mon(it.ym)+' · '+md(it.due)+(it.days>0?' · '+it.days+'일 늦음':(it.days===0?' · 오늘':'')))+'</span>'; }).join('')+(its.length>3?'<span class="ar2-sub">외 '+(its.length-3)+'건</span>':'');
+        return '<td style="padding:8px 8px;text-align:right;vertical-align:top"><span style="font-weight:700;color:'+k.color+'">'+won(cell.sum)+'</span>'+lines+'</td>';
+      }).join('');
+      return '<tr style="border-bottom:1px solid #F5F5F5;background:'+rowBg+';cursor:pointer" onclick="var d=document.getElementById(\'ar2_det_'+idx+'\');d.style.display=d.style.display===\'none\'?\'\':\'none\'">'
+        +'<td style="padding:8px 12px;font-weight:700;color:#1A237E;vertical-align:top">'+_ddEsc(c.client)+(c.noTerms?' <span title="거래처 결제조건 미설정 — 청구월 말일 기준" style="font-size:9px;color:#E65100;background:#FFF3E0;padding:1px 4px;border-radius:3px">조건없음</span>':(c.termsSrc==='default'?' <span title="거래처에 결제조건이 없어 기본 결제조건 적용" style="font-size:9px;color:#1565C0;background:#E3F2FD;padding:1px 4px;border-radius:3px">기본값</span>':''))+((typeof creditBadgeHtml==='function')?creditBadgeHtml(c.client,c.total):'')+'</td>'
+        +'<td style="padding:8px;text-align:center;font-size:11px;color:#666;vertical-align:top">'+_ddEsc(c.terms||'-')+'</td>'
+        +cellHtml
+        +'<td style="padding:8px 8px;text-align:right;font-weight:800;color:#333;vertical-align:top">'+won(c.total)+(c.overdue>0?'<span class="ar2-sub" style="color:#C62828">늦은 돈 '+won(c.overdue)+'</span>':'')+'</td>'
+        +'<td style="padding:8px 6px;vertical-align:top">'+bar+'</td>'
+        +'<td style="padding:8px;text-align:center;white-space:nowrap;vertical-align:top"><button data-client="'+_ddEsc(c.client)+'" onclick="event.stopPropagation();openPaymentModalFor(this.getAttribute(\'data-client\'))" style="padding:3px 10px;background:#E8EAF6;color:#1A237E;border:1px solid #C5CAE9;border-radius:4px;font-size:10px;cursor:pointer;white-space:nowrap">수금입력</button> <button data-client="'+_ddEsc(c.client)+'" onclick="event.stopPropagation();openClientLedger(this.getAttribute(\'data-client\'))" title="거래처 원장 — 이월 잔액·매출·수금·잔액" style="padding:3px 6px;background:#fff;color:#1A237E;border:1px solid #C5CAE9;border-radius:4px;font-size:10px;cursor:pointer;white-space:nowrap">📒</button></td>'
+        +'</tr>'
+        +'<tr id="ar2_det_'+idx+'" style="display:none;background:#FAFAFA"><td colspan="'+(cols.length+5)+'" style="padding:6px 16px 8px 28px">'+_arDetailHtml(c)+'</td></tr>';
+    },'받을 돈 '+c.client,cols.length+5);
+  }).join('')+creditLine;
+  if(tfoot) tfoot.innerHTML='<tr style="background:#FFEBEE;font-weight:700;border-top:2px solid #EF9A9A"><td style="padding:8px 12px;color:#B71C1C" colspan="2">합 계</td>'
+    +cols.map(function(k){ return '<td style="padding:8px 8px;text-align:right;color:'+(tot[k.key]>0?k.color:'#999')+'">'+won(tot[k.key])+'</td>'; }).join('')
+    +'<td style="padding:8px 8px;text-align:right">'+won(r.total)+'</td><td colspan="2" style="padding:8px;font-size:10px;color:#888;font-weight:400">받을 날 = 그 달 말일 + 거래처 결제조건 · 행을 누르면 달별 상세 · 더 받은 돈은 오래된 달부터 채워 계산</td></tr>';
+}
 function renderArAging(clientFilter){
   var tbody=document.getElementById('ar_tbody'), tfoot=document.getElementById('ar_tfoot'), kpi=document.getElementById('ar_kpi'); if(!tbody) return;
   var r=calcArAging(today(),clientFilter);
   var asof=document.getElementById('ar_asof'); if(asof) asof.textContent='(오늘 '+r.asOf+')';
   var dsel=document.getElementById('ar_default_terms'); if(dsel) dsel.value=getDefaultPaymentTerms();
   var abtn=document.getElementById('ar_apply_terms_btn'); if(abtn){ var _nt=clientsWithoutTerms().length; abtn.textContent=_nt?'미설정 거래처 '+_nt+'개에 적용':'모든 거래처 설정됨 ✔'; abtn.disabled=!_nt||!getDefaultPaymentTerms(); abtn.style.opacity=abtn.disabled?'0.6':'1'; }
+  var _v=arView(); try{ _arViewApply(_v); }catch(e){}
   var won=function(n){ return Math.round(n).toLocaleString()+'원'; };
   var over90=r.buckets[4], ovRate=r.total>0?Math.round(r.overdue/r.total*1000)/10:0;
   kpi.innerHTML=[
@@ -17652,7 +17760,7 @@ function renderArAging(clientFilter){
     {l:'최장 연체',v:r.maxDays>0?r.maxDays+'일':'없음',s:r.list.length?r.list.length+'개 거래처 미수':'',c:r.maxDays>90?'#4A148C':r.maxDays>0?'#E65100':'#2E7D32',bg:'#FAFAFA'}
   ].concat(r.credit>0?[{l:'선수금 (더 받은 돈)',v:won(r.credit),s:r.credits.length+'개 거래처 · 다음 청구에서 빠짐',c:'#00695C',bg:'#E0F2F1'}]:[]).map(function(t){ return '<div style="background:'+t.bg+';border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:#666;font-weight:700">'+t.l+'</div><div style="font-size:18px;font-weight:800;color:'+t.c+';font-variant-numeric:tabular-nums;white-space:nowrap">'+t.v+'</div>'+(t.s?'<div style="font-size:10px;color:#888;margin-top:2px">'+t.s+'</div>':'')+'</div>'; }).join('');
   var creditLine=r.credits.length?'<tr><td colspan="12" style="padding:6px 12px;font-size:11px;color:#00695C;background:#F1FBF9">💙 선수금(더 받은 돈): '+r.credits.map(function(x){ return '<span data-client="'+_ddEsc(x.client)+'" onclick="openClientLedger(this.getAttribute(\'data-client\'))" style="cursor:pointer;text-decoration:underline">'+_ddEsc(x.client)+'</span> '+won(x.advance); }).join(' · ')+' — 다음 청구에서 먼저 빠집니다</td></tr>':'';
-  if(!r.list.length){ tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:18px;color:#999">미수금이 없습니다 🎉</td></tr>'+creditLine; tfoot.innerHTML=''; return; }
+  if(!r.list.length){ tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:18px;color:#999">미수금이 없습니다 🎉</td></tr>'+creditLine; tfoot.innerHTML=''; if(_v==='when'){ try{ _arWhenRender(r,clientFilter); }catch(e){ console.error('arWhen',e); } } return; }
   var colors=['#1565C0','#F9A825','#EF6C00','#C62828','#4A148C'];
   tbody.innerHTML=r.list.map(function(c,idx){
     return safeRowHtml(function(){
@@ -17675,6 +17783,8 @@ function renderArAging(clientFilter){
   tfoot.innerHTML='<tr style="background:#FFEBEE;font-weight:700;border-top:2px solid #EF9A9A"><td style="padding:8px 12px;color:#B71C1C" colspan="2">합 계</td>'
     +r.buckets.map(function(b,i){ return '<td style="padding:8px 12px;text-align:right;color:'+(b>0?colors[i]:'#999')+'">'+won(b)+'</td>'; }).join('')
     +'<td style="padding:8px 12px;text-align:right;color:#C62828">'+won(r.overdue)+'</td><td style="padding:8px 12px;text-align:right">'+won(r.total)+'</td><td colspan="3" style="padding:8px;font-size:10px;color:#888;font-weight:400">행을 누르면 월별 상세가 펼쳐집니다 · 더 받은 돈은 오래된 달부터 채워 계산</td></tr>';
+  // 📅 달별 보기 (v2.5.6) — 예전 표(늦은 일수)도 늘 그려 두고(숨김) 달별 표·위 카드를 덮어씀. 오류가 나면 예전 표를 보여 줌
+  if(_v==='when'){ try{ _arWhenRender(r,clientFilter); }catch(e){ console.error('arWhen',e); try{ _arViewApply('age'); }catch(e2){} } }
 }
 
 function renderCollection(){
@@ -25455,7 +25565,7 @@ var HELP_TABS={
     m:['마감한 달 날짜의 출고·입고·수금은 고칠 수 없습니다. 지난달 수주의 남은 수량은 이번 달 날짜로 처리할 수 있습니다.','마감 뒤 숫자가 달라지면 목록에 "⚠️ 마감 뒤 달라짐"이 나옵니다. 잘못 마감했으면 [마감취소].'],
     b:[['🚚 납기관리로','go_delivery']]},
   tab_collection:{t:'💰 수금관리',d:'거래처별 청구(출고+부가세)·받은 돈(수금)·미수금·연체를 거래처 잔액 기준으로 봅니다.',
-    s:['[+ 수금 입력] → 거래처 → 청구연월(⚡ 오래된 미수 달부터 자동 배분) → 금액·날짜 → 저장.','인터넷뱅킹에서 거래내역을 엑셀(CSV)로 받아 [🏦 은행 내역 올리기] → 입금 줄마다 거래처가 맞춰져 나오면(✅ 맞춤·⚠️ 확인 필요·❓ 못 맞춤은 거래처 고르기) 체크해 [수금으로 넣기]. 같은 파일을 다시 올려도 이미 넣은 줄은 두 번 들어가지 않습니다.','거래처별 이월 잔액·출고·수금은 [📒 거래처 원장](인쇄·엑셀로 거래처에 보낼 수 있음).','앱을 쓰기 전 달(예: 7~9월)의 매출·수금은 [📥 세금계산서로 과거 자료]: 홈택스 → 전자(세금)계산서 → 목록조회 → 매출 → 엑셀 내려받기 한 파일을 올리면 계산서 한 장이 그 거래처·달의 청구로 들어가고(출고 없이 금액만 · 거래처등록에 없는 업체는 "＋ 신규 등록"), 수금은 엑셀 한 장(거래처·청구연월·수금일·금액·메모·은행원문)으로 넣습니다. 같은 승인번호·은행원문은 두 번 들어가지 않고, 넣은 직후 [↩ 되돌리기]가 됩니다.'],
+    s:['위쪽 "📅 받을 돈 — 언제 받나" 표: 거래처마다 받을 돈을 받을 날이 어느 달인지로 나눕니다 — 늦은 돈(받을 날 지남) · 이달(남은 날) · 다음 달 · … · 총 받을 돈. 칸 안의 "9월분 · 11/09"는 9월 매출을 11월 9일에 받는다는 뜻(받을 날 = 그 달 말일 + 거래처 결제조건). 거래처 줄을 누르면 달별 상세. [⏱ 늦은 일수]를 누르면 예전 표(미도래 · 받을 날 지난 지 1~30일 · 31~60일 …)로 바뀌고 선택은 이 기기에 기억됩니다.','[+ 수금 입력] → 거래처 → 청구연월(⚡ 오래된 미수 달부터 자동 배분) → 금액·날짜 → 저장.','인터넷뱅킹에서 거래내역을 엑셀(CSV)로 받아 [🏦 은행 내역 올리기] → 입금 줄마다 거래처가 맞춰져 나오면(✅ 맞춤·⚠️ 확인 필요·❓ 못 맞춤은 거래처 고르기) 체크해 [수금으로 넣기]. 같은 파일을 다시 올려도 이미 넣은 줄은 두 번 들어가지 않습니다.','거래처별 이월 잔액·출고·수금은 [📒 거래처 원장](인쇄·엑셀로 거래처에 보낼 수 있음).','앱을 쓰기 전 달(예: 7~9월)의 매출·수금은 [📥 세금계산서로 과거 자료]: 홈택스 → 전자(세금)계산서 → 목록조회 → 매출 → 엑셀 내려받기 한 파일을 올리면 계산서 한 장이 그 거래처·달의 청구로 들어가고(출고 없이 금액만 · 거래처등록에 없는 업체는 "＋ 신규 등록"), 수금은 엑셀 한 장(거래처·청구연월·수금일·금액·메모·은행원문)으로 넣습니다. 같은 승인번호·은행원문은 두 번 들어가지 않고, 넣은 직후 [↩ 되돌리기]가 됩니다.'],
     m:['출고 전에 받은 돈은 청구연월에서 "청구 없음 · 선수금" 달을 고르세요.','청구연월을 잘못 넣었으면 수금 내역의 [✏️ 수정]에서 바꾸면 그 달로 옮겨집니다.'],
     b:[['+ 수금 입력','pay']]},
   tab_inventory:{t:'📦 재고시트',d:'품목별 현재고(선입선출)·입고 예정·미발주·수주잔량·안전재고 부족을 보여 줍니다.',
@@ -25508,7 +25618,7 @@ var HELP_FIX=[
   {k:'relogin',t:'로그인 화면에 "로그인 유지 기한이 지나…" · "접속을 끊었습니다"가 떠요',s:['👥 팀 창의 "로그인 유지 기한"(기본 30일)이 지났거나 소유자·관리자가 그 기기의 [접속 끊기]를 누른 것입니다 — 그냥 다시 로그인하면 됩니다. 자료는 그대로이고 올라가지 않았던 변경도 이어서 올라갑니다.','기한이 번거로우면 소유자가 👥 팀 창에서 "없음"으로 바꿀 수 있습니다.'],b:[['👥 팀·로그인','team']]}
 ];
 // 이번 판에서 바뀐 점 (README ⑩ v2.5.0 간추림)
-var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억) · 제품마스터 매입단가를 바꿀 때 이미 입고한 건(열린 달)에도 소급할지 묻기.','v2.5.2: 거래처 수금조건에 마감후 30일·40일·45일 추가 (수금예정일 = 그 달 말일 + N일).','v2.5.3: 손익분석 🏠 월 고정비(월세·차량 등) → 홈·손익분석·차트·목표의 영업이익이 고정비까지 뺀 값으로 · 수주 창·제품마스터 창에 마진 표시, 5% 이하면 ⚠️(저장 뒤 빨간 안내) · 홈 💵 자금 흐름 카드(이달·다음달 받을 돈·줄 돈·고정비·차이, 매입 결제조건).','v2.5.4: 🧷 공용 품목 — 스트레치필름·밴딩끈처럼 모든 거래처에 파는 품목을 제품마스터에 한 번만 등록(단위 박스·롤 등 · 거래처별 단가 · 재고 하나) · 수주 창 품명 목록에 [공용] · 재고용 발주에 "(공용)" · 거래명세표·발주서·수주 목록에 단위 표시 · [공용으로 묶기].','v2.5.5: 📥 세금계산서로 과거 자료 넣기 — 홈택스 전자세금계산서 목록(매출·매입) 엑셀로 앱을 쓰기 전 달의 매출·매입을 거래처·월별 금액으로(수금관리·거래처 원장·매출원장·매입원장·손익·세금계산서 준비·부가세 자료에 "🧾 세금계산서" 줄) · 수금 목록 엑셀(거래처·청구연월·수금일·금액)로 그 달 수금 · 같은 승인번호·은행원문은 두 번 안 들어감 · [↩ 되돌리기].'];
+var H_VER_NOTES=['부가세가 모든 화면에서 같아졌습니다(공급가의 10%) — "계산서 발행 업체"는 "세금계산서 발행 대상" 표시로.','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억) · 제품마스터 매입단가를 바꿀 때 이미 입고한 건(열린 달)에도 소급할지 묻기.','v2.5.2: 거래처 수금조건에 마감후 30일·40일·45일 추가 (수금예정일 = 그 달 말일 + N일).','v2.5.3: 손익분석 🏠 월 고정비(월세·차량 등) → 홈·손익분석·차트·목표의 영업이익이 고정비까지 뺀 값으로 · 수주 창·제품마스터 창에 마진 표시, 5% 이하면 ⚠️(저장 뒤 빨간 안내) · 홈 💵 자금 흐름 카드(이달·다음달 받을 돈·줄 돈·고정비·차이, 매입 결제조건).','v2.5.4: 🧷 공용 품목 — 스트레치필름·밴딩끈처럼 모든 거래처에 파는 품목을 제품마스터에 한 번만 등록(단위 박스·롤 등 · 거래처별 단가 · 재고 하나) · 수주 창 품명 목록에 [공용] · 재고용 발주에 "(공용)" · 거래명세표·발주서·수주 목록에 단위 표시 · [공용으로 묶기].','v2.5.5: 📥 세금계산서로 과거 자료 넣기 — 홈택스 전자세금계산서 목록(매출·매입) 엑셀로 앱을 쓰기 전 달의 매출·매입을 거래처·월별 금액으로(수금관리·거래처 원장·매출원장·매입원장·손익·세금계산서 준비·부가세 자료에 "🧾 세금계산서" 줄) · 수금 목록 엑셀(거래처·청구연월·수금일·금액)로 그 달 수금 · 같은 승인번호·은행원문은 두 번 안 들어감 · [↩ 되돌리기].','v2.5.6: 수금관리 위쪽 표가 "📅 받을 돈 — 언제 받나"(달별)로 — 거래처마다 늦은 돈 · 이달(남은 날) · 다음 달 · … 칸에 "9월분 · 11/09"처럼 어느 달 매출을 언제 받는지 표시 · [⏱ 늦은 일수]로 예전 표 전환(기기에 기억).'];
 // 도움말 버튼이 부르는 동작 (버튼에는 키만 — 이름·자료는 넣지 않음)
 function _hCan(act){ try{ return typeof canDo==='function'?canDo(act)!==false:true; }catch(e){ return true; } }
 function _hNoEdit(){ try{ showInfoToast('🔒 보기 전용 권한이라 입력 창을 열 수 없습니다.','#B71C1C'); }catch(e){} }
@@ -26084,8 +26194,8 @@ function _hMcCommit(){
 //  · 요약 카드 표(원장·매입원장·손익·세금계산서 준비·반품·목형·견적·마감 목록): 칸 이름은 그 표의 머리글에서(data-lb) · [📋 표 전체 보기]
 //  · 두 가지 모두: 빈 칸('-')은 카드에서 숨김(m-nil) · 합계 줄(tfoot) 칸에도 머리글 이름 — 표가 다시 그려질 때마다(MutationObserver) 폰에서만
 var H_CARD=['master_tbody','client_tbody','inv_tbody','ar_tbody','col_aging_tbody','col_detail_tbody'];
-var H_SUM={ledger_tbody:{key:['거래처'],amt:['공급가액']},pur_tbody:{key:['발주처'],amt:['매입금액']},profit_tbody:{key:['거래처','월','연월'],amt:['순이익']},tx_tbody:{key:['거래처'],amt:['합계']},ret_tbody:{key:['거래처'],amt:['금액 반영(공급가)']},tool_tbody:{key:['명칭'],amt:[]},qt_tbody:{key:['거래처'],amt:['합계금액']},closing_tbody:{key:['마감 연월'],amt:[]}};
-function _hThTexts(tbl){ var hr=tbl.tHead&&tbl.tHead.rows.length?tbl.tHead.rows[tbl.tHead.rows.length-1]:null; return hr?Array.prototype.map.call(hr.cells,function(th){ return String(th.textContent||'').replace(/[▲▼↑↓⇅]/g,'').replace(/\s+/g,' ').trim(); }):[]; }
+var H_SUM={ar2_tbody:{key:['거래처'],amt:['총 받을 돈']},ledger_tbody:{key:['거래처'],amt:['공급가액']},pur_tbody:{key:['발주처'],amt:['매입금액']},profit_tbody:{key:['거래처','월','연월'],amt:['순이익']},tx_tbody:{key:['거래처'],amt:['합계']},ret_tbody:{key:['거래처'],amt:['금액 반영(공급가)']},tool_tbody:{key:['명칭'],amt:[]},qt_tbody:{key:['거래처'],amt:['합계금액']},closing_tbody:{key:['마감 연월'],amt:[]}};
+function _hThTexts(tbl){ var hr=tbl.tHead&&tbl.tHead.rows.length?tbl.tHead.rows[tbl.tHead.rows.length-1]:null; return hr?Array.prototype.map.call(hr.cells,function(th){ var lb=th.getAttribute('data-lb'); if(lb) return String(lb).trim(); return String(th.textContent||'').replace(/[▲▼↑↓⇅]/g,'').replace(/\s+/g,' ').trim(); }):[]; } // th 에 data-lb 가 있으면 그 이름으로 (머리글에 작은 설명 줄이 붙은 표 — v2.5.6)
 function _hCardMark(tbl,cfg){
   if(!tbl) return; var th=_hThTexts(tbl), ki=-1, ai=-1, n=0;
   if(cfg) th.forEach(function(x,i){ if(ki<0&&cfg.key.indexOf(x)!==-1) ki=i; if(ai<0&&cfg.amt.indexOf(x)!==-1) ai=i; });

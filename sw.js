@@ -1,5 +1,5 @@
 // 박스 ERP 서비스워커 — 앱 셸 오프라인 캐시 (데이터는 Firebase/localStorage가 담당)
-const VERSION='box-erp-v29';
+const VERSION='box-erp-v30';
 const CDN_HOSTS=['cdnjs.cloudflare.com','www.gstatic.com'];
 // 새 판을 설치할 때 앱 셸을 미리 담아 둠 — 옛 캐시를 지운 직후 인터넷이 끊겨도 앱이 열리게 (R3-05)
 const PRECACHE=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./icon-512-maskable.png'];
