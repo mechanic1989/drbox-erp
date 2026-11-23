@@ -1947,7 +1947,7 @@ if(fbReady){
   <span class="app-logo" style="font-size:20px">📦</span>
   <div style="flex:0 1 auto;min-width:0">
     <div class="app-title" style="font-size:13px;font-weight:700;white-space:nowrap">박스 단가 계산기</div>
-    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.6.5</span></div>
+    <div class="app-sub" style="font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">원단가·치수·기기판단·밴딩수·적재패턴·차량적재 <span style="background:#E53935;padding:1px 5px;border-radius:4px;font-weight:700">v2.6.6</span></div>
   </div>
   <!-- 통합 검색 -->
   <div id="gs_wrap" class="gs-wrap">
@@ -2298,7 +2298,7 @@ if(fbReady){
 <div class="col34wrap">
   <!-- 전개도: 열3+열4 전체 너비 -->
   <div class="col34diag">
-    <div class="col-hdr or">✏️ 전개도</div>
+    <div class="col-hdr or">✏️ 전개도<button type="button" onclick="box3dOpenCalc()" title="지금 치수로 접은 모습을 봅니다(A-1형) — 사양서 그림을 올리면 디자인을 입혀서" style="margin-left:auto;padding:3px 9px;background:#fff;color:#BF360C;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">🧊 3D로 접어 보기</button></div>
     <div class="card mt" style="margin-top:4px">
       <div class="cb">
         <div id="diagram_info" style="font-size:9px;color:#666;margin-bottom:5px">-</div>
@@ -3412,7 +3412,8 @@ if(fbReady){
     <div id="o_spec_panel" style="display:none;border-bottom:2px solid #E3F2FD;background:#F0F4FF;flex-shrink:0;overflow:hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:#E3F2FD">
         <span style="font-size:11px;font-weight:700;color:#1F4E79">📋 인쇄사양서</span>
-        <button onclick="_closeOrderSpec()" style="padding:2px 8px;background:none;border:1px solid #90CAF9;border-radius:4px;font-size:10px;color:#1565C0;cursor:pointer">닫기</button>
+        <span style="display:flex;gap:6px;align-items:center"><button type="button" onclick="box3dOpenOrder()" title="이 품목을 접은 모습으로 봅니다 — 사양서 그림의 디자인을 입혀서" style="padding:2px 8px;background:#fff;border:1px solid #90CAF9;border-radius:4px;font-size:10px;font-weight:700;color:#1565C0;cursor:pointer">🧊 3D로 접어 보기</button>
+        <button onclick="_closeOrderSpec()" style="padding:2px 8px;background:none;border:1px solid #90CAF9;border-radius:4px;font-size:10px;color:#1565C0;cursor:pointer">닫기</button></span>
       </div>
       <div id="o_spec_content" style="overflow:auto;max-height:420px;padding:8px;text-align:center"></div>
     </div>
@@ -3663,10 +3664,11 @@ if(fbReady){
       </div>
       <div style="grid-column:1/-1">
         <label style="font-size:10px;color:#666;font-weight:600;display:block;margin-bottom:4px">사양서 파일 (사진·이미지 또는 PDF 3MB까지 · 큰 사진은 자동으로 줄여 저장) — 로그인 상태면 클라우드에 따로 보관되어 다른 기기·팀원도 봅니다 (로컬 모드는 이 기기에만)</label>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
           <button type="button" onclick="document.getElementById('m_spec_file_input').click()" style="padding:6px 14px;background:#4E342E;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">📎 파일 선택</button>
           <button type="button" id="m_spec_remove_btn" onclick="removeSpecFile()" style="display:none;padding:6px 12px;background:#EF5350;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">✕ 제거</button>
           <button type="button" id="m_spec_download_btn" onclick="downloadSpecFile()" style="display:none;padding:6px 12px;background:#1565C0;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer">⬇ 다운로드</button>
+          <button type="button" id="m_spec_3d_btn" onclick="box3dOpenForm()" title="지금 창에 적힌 장·폭·고로 접은 모습을 봅니다 — 사양서 그림이 붙어 있으면 디자인을 입혀서" style="padding:6px 12px;background:#fff;color:#4E342E;border:1px solid #BCAAA4;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">🧊 3D로 접어 보기</button>
           <span id="m_spec_filename" style="font-size:11px;color:#888">선택된 파일 없음</span>
         </div>
         <input type="file" id="m_spec_file_input" accept="image/*,.pdf" onchange="loadSpecFile(this)" style="display:none">
@@ -10765,6 +10767,7 @@ function renderMaster(){
       })()
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;font-size:10px;color:#00695C">'+E(destDisp)+'</td>'
       +'<td style="padding:6px;text-align:center;border-bottom:1px solid #EEE;white-space:nowrap">'
+        +((+m.jang>0&&+m.pok>0&&+m.go>0&&!m.common)?'<button onclick="box3dOpenMaster('+i+')" style="padding:3px 7px;background:#EFEBE9;color:#4E342E;border:1px solid #BCAAA4;border-radius:4px;font-size:10px;cursor:pointer;margin-right:3px" title="접은 모습 보기 — 인쇄사양서 그림이 붙어 있으면 디자인을 입혀서">🧊3D</button>':'')
         +'<button data-action="priceReserve" data-idx="'+i+'" style="padding:3px 7px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:4px;font-size:10px;cursor:pointer;margin-right:3px" title="미래 단가 예약">📅예약</button>'
         +'<button onclick="openPriceHistory('+i+')" style="padding:3px 7px;background:'+(m.priceHistory&&m.priceHistory.length>1?'#FFF3E0':'#F5F5F5')+';color:'+(m.priceHistory&&m.priceHistory.length>1?'#E65100':'#888')+';border:1px solid '+(m.priceHistory&&m.priceHistory.length>1?'#FFCC80':'#DDD')+';border-radius:4px;font-size:10px;cursor:pointer;margin-right:3px" title="단가 이력 조회">📈이력'+(m.priceHistory&&m.priceHistory.length>1?' ('+m.priceHistory.length+')':'')+'</button>'
         +'<button data-action="editMaster" data-idx="'+i+'" style="padding:3px 8px;background:#EEF4FF;color:#1F4E79;border:1px solid #C5D4E8;border-radius:4px;font-size:10px;cursor:pointer;margin-right:2px">수정</button>'
@@ -10998,6 +11001,7 @@ function downloadSpecFile(){
   document.body.removeChild(a);
 }
 function _updateOrderSpecPanel(masterItem){
+  window._b3OrderItem=masterItem||null; // 🧊 3D로 접어 보기(v2.6.6)가 쓸 지금 품목
   var panel=document.getElementById('o_spec_panel');
   var content=document.getElementById('o_spec_content');
   if(!panel||!content) return;
@@ -23381,6 +23385,520 @@ function _specFetchMissing(){
 }
 
 // ══════════════════════════════════════
+// 🧊 3D로 접어 보기 (v2.6.6) — A-1형 전개도를 접어서 보여 주고, 인쇄사양서 그림이 있으면 겉면에 입힘
+//  · 여는 곳: 제품마스터 목록의 [🧊3D] · 제품 창의 인쇄사양서 칸 · 수주 입력 창의 사양서 패널 · 단가계산기의 전개도
+//  · 치수 계산은 단가계산기와 같음: 전장 = 미미 40 + 장 + 폭 + 장 + 폭 · 재단 = 날개(폭÷2, 홀수는 올림) + 고 + 날개 (절수용 날개 여유는 그리지 않음)
+//  · 사양서 그림 속 전개도 선(위·아래 가로선 · 양 끝과 한가운데 세로선 · 괘선)을 찾아 자리를 맞춤 — 못 찾으면 모서리를 끌어 맞추고, 그 자리는 이 기기에 기억(b3_fit_<사양서 해시>)
+//  · 그림은 이 기기 안에서만 쓰고 어디로도 보내지 않음 · 저장 자료(제품·사양서)는 건드리지 않음 · 외부 라이브러리 없이 CSS 3D
+// ══════════════════════════════════════
+var box3d=(function(){
+'use strict';
+var MIMI=40, SLOT=6, D2R=Math.PI/180;
+var S=null;   // 열려 있는 창의 상태 (닫으면 null)
+var reduce=false; try{ reduce=!!window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+function $(id){ return document.getElementById(id); }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function r1(v){ return Math.round(v*10)/10; }
+function r2(v){ return Math.round(v*100)/100; }
+function toast(t){ try{ showInfoToast(t,'#4E342E'); }catch(e){ alert(t); } }
+function lsGet(k){ try{ return store.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ if(v===null) store.removeItem(k); else store.setItem(k,v); }catch(e){} }
+function dropUrl(u){ if(u&&/^blob:/.test(u)){ try{ URL.revokeObjectURL(u); }catch(e){} } }
+// 나중에 돌아오는 일(그림 읽기·접는 모습)이 아직 그 창의 것인지 — 창이 다른 방법으로 지워졌으면 정리하고 그만둠
+function live(st){ if(!st||S!==st) return false; if(st.ov&&st.ov.isConnected) return true; close(); return false; }
+
+var CSS=''
++'.b3{font-size:13px;color:#263238;line-height:1.5}'
++'.b3 [hidden]{display:none!important}'
++'.b3-top{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;margin-bottom:8px}'
++'.b3-top b{font-size:15px;color:#4E342E;word-break:break-all}'
++'.b3-top span{font-size:12px;color:#607D8B}'
++'.b3-stage{position:relative;height:clamp(240px,min(46vh,68vw),430px);perspective:1500px;perspective-origin:50% 42%;overflow:hidden;border-radius:8px;background:#DDE3E9;touch-action:pan-y;cursor:grab;user-select:none;-webkit-user-select:none}'
++'.b3-stage:active{cursor:grabbing}'
++'.b3-stage:focus-visible{outline:2px solid #1565C0;outline-offset:2px}'
++'.b3-scene{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}'
++'.b3-pivot{position:absolute;left:0;top:0;transform-style:preserve-3d}'
++'.b3-p3{position:absolute;transform-style:preserve-3d}'
++'.b3-f3{position:absolute;inset:-0.4px;border:1px solid #7A5A2E;backface-visibility:hidden;-webkit-backface-visibility:hidden}'
++'.b3-f3.in{transform:rotateY(180deg)}'
++'.b3-f3.out{background-image:var(--b3-art,none);background-repeat:no-repeat;background-origin:border-box;background-blend-mode:multiply}'
++'.b3-ctl{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;margin-top:8px}'
++'.b3-ctl label{font-size:12px;color:#607D8B}'
++'.b3-ctl input[type=range]{width:100%;accent-color:#4E342E;height:28px}'
++'.b3-btn{font-size:12px;font-weight:700;border-radius:7px;padding:7px 12px;cursor:pointer;border:1px solid #BCAAA4;background:#fff;color:#4E342E;min-height:34px}'
++'.b3-btn.main{background:#4E342E;border-color:#4E342E;color:#fff}'
++'.b3-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}'
++'.b3-seg{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-left:auto;font-size:12px;color:#607D8B}'
++'.b3-seg label{display:inline-flex;align-items:center;gap:4px;border:1px solid #D7CCC8;border-radius:999px;padding:5px 10px;cursor:pointer;color:#263238;background:#fff}'
++'.b3-seg input{accent-color:#4E342E}'
++'.b3-msg{margin-top:8px;font-size:12px;color:#546E7A;min-height:1.5em}'
++'.b3-msg.warn{color:#6B4300;background:#FFF4E0;border-radius:7px;padding:7px 10px}'
++'.b3-two{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px}'
++'@media(min-width:900px){.b3-two.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.b3-two:not(.two) .b3-panel{max-width:640px}}'
++'.b3-panel{border:1px solid #E0E0E0;border-radius:8px;padding:8px 10px;min-width:0}'
++'.b3-h{font-size:12px;font-weight:700;color:#4E342E;margin-bottom:6px}'
++'.b3-h small{font-weight:400;color:#78909C;font-size:11px;margin-left:4px}'
++'.b3-fit{position:relative;line-height:0;border:1px solid #CFD8DC;background:#fff}'
++'.b3-fit img{display:block;width:100%;height:auto;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}'
++'.b3-fit svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}'
++'.b3-fit .dimr{fill:rgba(12,22,34,.36)}'
++'.b3-fit .oc{fill:none;stroke:#0A84FF;stroke-width:2;vector-effect:non-scaling-stroke}'
++'.b3-fit .or{fill:none;stroke:#FF5A1F;stroke-width:1.6;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}'
++'.b3-hd{position:absolute;width:36px;height:36px;margin:-18px 0 0 -18px;padding:0;border:0;border-radius:50%;background:transparent;cursor:grab;touch-action:none}'
++'.b3-hd::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-10px 0 0 -10px;border-radius:50%;background:#fff;border:3px solid #0A84FF;box-shadow:0 1px 4px rgba(0,0,0,.45)}'
++'.b3-hd:active{cursor:grabbing}'
++'.b3-hd:focus-visible{outline:2px solid #0A84FF;outline-offset:-4px}'
++'.b3-flat svg{display:block;width:100%;height:auto}'
++'.b3-flat .cut{fill:none;stroke:#1F4E79;stroke-width:1.5;vector-effect:non-scaling-stroke}'
++'.b3-flat .crease{fill:none;stroke:#E65100;stroke-width:1.2;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}'
++'.b3-flat .dim{fill:none;stroke:#90A4AE;stroke-width:0.8;vector-effect:non-scaling-stroke}'
++'.b3-flat text{font-family:monospace;fill:#607D8B}'
++'.b3-note{margin-top:10px;font-size:11px;color:#78909C}'
++'.b3-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);opacity:0;pointer-events:none}';
+function ensureStyle(){ if($('b3_style')) return; var st=document.createElement('style'); st.id='b3_style'; st.textContent=CSS; document.head.appendChild(st); }
+
+var HTML=''
++'<div class="b3-top"><b id="b3_name"></b><span id="b3_dims"></span></div>'
++'<div class="b3-stage" id="b3_stage" tabindex="0" role="img" aria-label="전개도가 상자로 접히는 3D 그림. 좌우로 끌거나 화살표 키로 돌립니다."><div class="b3-scene" id="b3_scene"><div class="b3-pivot" id="b3_pivot"></div></div></div>'
++'<div class="b3-ctl"><label for="b3_fold">접기</label><input id="b3_fold" type="range" min="0" max="100" step="1" value="74" aria-label="접는 정도"><button type="button" class="b3-btn" id="b3_play">▶ 접는 모습</button></div>'
++'<div class="b3-bar">'
++'<button type="button" class="b3-btn main" id="b3_up">🖼 그림 올려서 보기</button><input type="file" id="b3_file" class="b3-vh" accept="image/*" tabindex="-1" aria-hidden="true">'
++'<button type="button" class="b3-btn" id="b3_auto" hidden>자동으로 맞추기</button>'
++'<span class="b3-seg" role="radiogroup" aria-label="원단 겉면 색">원단 겉면 <label><input type="radio" name="b3_board" value="kraft"> 크라프트</label><label><input type="radio" name="b3_board" value="white"> 백색</label></span>'
++'</div>'
++'<div class="b3-msg" id="b3_msg" role="status" aria-live="polite"></div>'
++'<div class="b3-two" id="b3_two">'
++'<div class="b3-panel" id="b3_fitbox" hidden><div class="b3-h">사양서에서 잡은 전개도 자리<small>색 선이 그림의 선과 겹치면 맞은 것 · 어긋나면 모서리 ● 을 끌어 맞춤(미미는 빼고)</small></div>'
++'<div class="b3-fit"><img id="b3_fitimg" alt="인쇄사양서 그림. 색 선은 계산한 전개도가 놓인 자리입니다." draggable="false"><svg id="b3_fitov" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true"></svg>'
++'<button type="button" class="b3-hd" data-c="tl" aria-label="전개도 왼쪽 위 모서리 — 끌거나 화살표 키로 옮깁니다"></button><button type="button" class="b3-hd" data-c="tr" aria-label="전개도 오른쪽 위 모서리"></button>'
++'<button type="button" class="b3-hd" data-c="bl" aria-label="전개도 왼쪽 아래 모서리"></button><button type="button" class="b3-hd" data-c="br" aria-label="전개도 오른쪽 아래 모서리"></button></div></div>'
++'<div class="b3-panel"><div class="b3-h">전개도<small id="b3_flatsub"></small></div><div class="b3-flat" id="b3_flat"></div></div>'
++'</div>'
++'<div class="b3-note" id="b3_note"></div>';
+
+// ── 1. 전개도 계산 (A-1형 · 단가계산기와 같은 식) ──
+function calc(L,W,H){
+  var F=Math.ceil(W/2), G=MIMI, h=Math.min(SLOT,Math.min(L,W)*0.5)/2, c=Math.min(15,G*0.4,H*0.2), i;
+  var x=[0,G,G+L,G+L+W,G+2*L+W,G+2*L+2*W], y=[0,F,F+H,2*F+H];
+  var o=[[x[0],y[1]+c],[x[1],y[1]],[x[1],y[0]]];   // 바깥 테두리(시계 방향) — 미미는 모따기
+  for(i=2;i<=4;i++) o.push([x[i]-h,y[0]],[x[i]-h,y[1]],[x[i]+h,y[1]],[x[i]+h,y[0]]);
+  o.push([x[5],y[0]],[x[5],y[3]]);
+  for(i=4;i>=2;i--) o.push([x[i]+h,y[3]],[x[i]+h,y[2]],[x[i]-h,y[2]],[x[i]-h,y[3]]);
+  o.push([x[1],y[3]],[x[1],y[2]],[x[0],y[2]-c]);
+  var crease=[]; for(i=1;i<=4;i++) crease.push([x[i],y[1],x[i],y[2]]);
+  [y[1],y[2]].forEach(function(yy){ var xs=[x[1],x[2]-h,x[2]+h,x[3]-h,x[3]+h,x[4]-h,x[4]+h,x[5]]; for(var j=0;j<xs.length;j+=2) crease.push([xs[j],yy,xs[j+1],yy]); });
+  var flaps=[]; for(i=1;i<=4;i++){ var il=(i===1)?0:h, ir=(i===4)?0:h; flaps.push({x:x[i]+il,w:(x[i+1]-x[i])-il-ir,il:il}); }
+  return {L:L,W:W,H:H,F:F,G:G,h:h,c:c,x:x,y:y,Wd:x[5],Ht:y[3],outline:o,crease:crease,flaps:flaps};
+}
+
+// ── 2. 3D: 면을 괘선에 매달아 접음 ──
+function build3d(){
+  if(!S) return;
+  var d=S.d, stage=$('b3_stage'), pivot=$('b3_pivot'); if(!stage||!pivot) return;
+  pivot.textContent=''; S.faces=[];
+  S.colOut=(S.board==='white')?[244,241,233]:[198,156,99]; S.colIn=[220,193,149];
+  var cw=stage.clientWidth||600, ch=stage.clientHeight||340, s0=Math.min(cw*0.9/d.Wd,ch*0.84/d.Ht);
+  var zBox=clamp(Math.min(cw*0.60/((d.L+d.W)*0.92*s0),ch*0.58/((d.H+d.W*0.6)*s0)),1,4), s=s0*zBox;   // 면은 다 접었을 때 크기로 만들고 펼친 모습은 줄여서 보임(입힌 그림이 흐려지지 않게)
+  var zOpen=clamp(ch*0.80/(((d.H+2*d.F)*0.927+(d.W*0.866+d.L*0.5)*0.375)*s0),0.5,zBox);       // 날개가 서 있을 때도 화면 안에 들어오는 배율
+  S.geo={s:s,zBox:zBox,zOpen:zOpen,cF:[s*(d.L+d.W-d.G/2),s*d.H/2,0],cB:[s*d.L/2,s*d.H/2,-s*d.W/2]};
+  var mk=function(w,h,meta){ var e=document.createElement('div'); e.className='b3-p3'; e.style.width=(w*s)+'px'; e.style.height=(h*s)+'px'; var o=document.createElement('div'), i=document.createElement('div'); o.className='b3-f3 out'; i.className='b3-f3 in'; e.appendChild(o); e.appendChild(i); S.faces.push({o:o,i:i,m:meta}); return e; };
+  var widths=[d.L,d.W,d.L,d.W], parent=pivot, left=0;
+  for(var k=0;k<4;k++){
+    var e=mk(widths[k],d.H,{t:'body',k:k,fx:d.x[k+1],fy:d.y[1]}); e.style.left=(left*s)+'px'; e.style.top='0px';
+    if(k>0){ e.style.transformOrigin='0 50%'; e.style.transform='rotateY(var(--a))'; }
+    parent.appendChild(e);
+    var f=d.flaps[k], inner=(k%2===1);   // 폭 쪽 날개가 먼저(안), 장 쪽 날개가 나중(밖)
+    var tf=mk(f.w,d.F,{t:'top',k:k,inner:inner,fx:f.x,fy:d.y[0]}); tf.style.left=(f.il*s)+'px'; tf.style.top=(-d.F*s)+'px'; tf.style.transformOrigin='50% 100%'; tf.style.transform='rotateX(var(--'+(inner?'ti':'to')+'))'; e.appendChild(tf);
+    var bf=mk(f.w,d.F,{t:'bot',k:k,inner:inner,fx:f.x,fy:d.y[2]}); bf.style.left=(f.il*s)+'px'; bf.style.top=(d.H*s)+'px'; bf.style.transformOrigin='50% 0'; bf.style.transform='rotateX(calc(var(--'+(inner?'bi':'bo')+') * -1))'; e.appendChild(bf);
+    if(k===0){
+      var g=mk(d.G,d.H,{t:'glue',fx:d.x[0],fy:d.y[1]}); g.style.left=(-d.G*s)+'px'; g.style.top='0px'; g.style.transformOrigin='100% 50%'; g.style.transform='rotateY(calc(var(--g) * -1))';
+      var cp=(d.c/d.H*100).toFixed(2), cq=(100-d.c/d.H*100).toFixed(2); g.firstChild.style.clipPath='polygon(0 '+cp+'%,100% 0,100% 100%,0 '+cq+'%)'; g.lastChild.style.clipPath='polygon(0 0,100% '+cp+'%,100% '+cq+'%,0 100%)';
+      e.appendChild(g);
+    }
+    parent=e; left=widths[k];
+  }
+  texAll(); applyFold();
+}
+function seg01(p,a,b){ return clamp((p-a)/(b-a),0,1); }
+function ease(v){ return v*v*(3-2*v); }
+var LGT=(function(){ var v=[-0.45,-0.65,0.62], n=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]); return [v[0]/n,v[1]/n,v[2]/n]; })();
+function applyFold(){
+  if(!S||!S.geo) return;
+  var pvEl=$('b3_pivot'), scEl=$('b3_scene'); if(!pvEl||!scEl) return;
+  var geo=S.geo, view=S.view, p=S.fold, e1=ease(seg01(p,0,0.46)), bi=ease(seg01(p,0.46,0.60)), bo=ease(seg01(p,0.60,0.74)), ti=ease(seg01(p,0.74,0.87)), to=ease(seg01(p,0.87,1));
+  var A=90*e1, Gd=92*e1, BI=91.5*bi, BO=90*bo, TI=91.5*ti, TO=90*to;   // 안쪽 날개·미미는 살짝 더 접어 겹치는 면이 떨리지 않게
+  var pv=pvEl.style; pv.setProperty('--a',A+'deg'); pv.setProperty('--g',Gd+'deg'); pv.setProperty('--bi',BI+'deg'); pv.setProperty('--bo',BO+'deg'); pv.setProperty('--ti',TI+'deg'); pv.setProperty('--to',TO+'deg');
+  var z=((1+(geo.zOpen-1)*e1)+(geo.zBox-geo.zOpen)*(ti+to)/2)/geo.zBox, c=[0,1,2].map(function(i){ return geo.cF[i]+(geo.cB[i]-geo.cF[i])*e1; });
+  pv.transform='scale3d('+z+','+z+','+z+') translate3d('+(-c[0])+'px,'+(-c[1])+'px,'+(-c[2])+'px)';
+  scEl.style.transform='rotateX('+view.rx+'deg) rotateY('+view.ry+'deg)';
+  // 밝기: 면의 방향과 빛(왼쪽 위 앞)에 따라
+  var rx=view.rx*D2R, ry=view.ry*D2R, cy=Math.cos(ry), sy=Math.sin(ry), cx=Math.cos(rx), sx=Math.sin(rx), white=(S.board==='white'), cO=S.colOut, cI=S.colIn;
+  var mix=function(col,b){ return 'rgb('+Math.round(clamp(col[0]*b,0,255))+','+Math.round(clamp(col[1]*b,0,255))+','+Math.round(clamp(col[2]*b,0,255))+')'; };
+  S.faces.forEach(function(f){
+    var m=f.m, n, a2;
+    if(m.t==='body'){ a2=m.k*A*D2R; n=[Math.sin(a2),0,Math.cos(a2)]; }
+    else if(m.t==='glue'){ a2=Gd*D2R; n=[-Math.sin(a2),0,Math.cos(a2)]; }
+    else { a2=m.k*A*D2R; var ps=(m.t==='top'?(m.inner?TI:TO):(m.inner?BI:BO))*D2R, cz=Math.cos(ps); n=[Math.sin(a2)*cz,(m.t==='top'?-1:1)*Math.sin(ps),Math.cos(a2)*cz]; }
+    var vx=n[0]*cy+n[2]*sy, vz0=-n[0]*sy+n[2]*cy, vy=n[1]*cx-vz0*sx, vz=n[1]*sx+vz0*cx, dot=vx*LGT[0]+vy*LGT[1]+vz*LGT[2];
+    f.o.style.backgroundColor=mix(cO,white?0.76+0.27*Math.max(0,dot):0.60+0.42*Math.max(0,dot));   // 백색 원단은 그늘을 덜 지게
+    f.i.style.backgroundColor=mix(cI,0.58+0.44*Math.max(0,-dot));
+  });
+}
+function setFold(v,fromSlider){ if(!S) return; S.fold=clamp(v,0,1); if(!fromSlider){ var sl=$('b3_fold'); if(sl) sl.value=Math.round(S.fold*100); } applyFold(); }
+function stopPlay(){ if(!S) return; if(S.playing){ cancelAnimationFrame(S.playing); S.playing=0; } var b=$('b3_play'); if(b) b.textContent='▶ 접는 모습'; }
+function play(){
+  if(!S) return;
+  if(S.playing){ stopPlay(); return; }
+  var st=S, t0=null, dur=3400, b=$('b3_play'); if(b) b.textContent='■ 멈춤';
+  var step=function(ts){
+    if(!live(st)){ st.playing=0; return; }   // 그 사이 창이 닫혔음
+    if(t0===null) t0=ts; var q=(ts-t0)/dur; setFold(q);
+    if(q>=1){ stopPlay(); return; }
+    st.playing=requestAnimationFrame(step);
+  };
+  st.playing=requestAnimationFrame(step);
+}
+function startPlay(){ if(!S) return; stopPlay(); if(reduce){ setFold(1); return; } setFold(0); play(); }
+
+// ── 3. 디자인 입히기 ── 그림에서 전개도가 놓인 네모(fit)를 잡고, 면마다 그 자리의 그림을 배경으로 붙임
+// 그림 px ↔ 전개도 mm: 네모의 두 모서리 = 전개도의 (미미 오른쪽 끝, 맨 위) ~ (맨 오른쪽, 맨 아래)
+function artMap(){ var d=S.d, f=S.art.fit, kx=(f.x1-f.x0)/(d.x[5]-d.x[1]), ky=(f.y1-f.y0)/(d.y[3]-d.y[0]); return {kx:kx,ky:ky,left:d.x[1]-f.x0/kx,top:d.y[0]-f.y0/ky}; }
+function texAll(){
+  if(!S) return;
+  var a=S.art, on=!!(a&&a.fit&&S.geo), m=on?artMap():null, sc=S.geo?S.geo.s:1;
+  S.faces.forEach(function(f){
+    var st=f.o.style;
+    if(!on){ st.backgroundSize=''; st.backgroundPosition=''; return; }
+    st.backgroundSize=(a.w/m.kx*sc)+'px '+(a.h/m.ky*sc)+'px';
+    st.backgroundPosition=((m.left-f.m.fx)*sc+0.4)+'px '+((m.top-f.m.fy)*sc+0.4)+'px';   // 0.4 = 면을 살짝 키워 둔 만큼
+  });
+}
+// 긴 가로·세로 선 찾기: '가는 선' 점이 길게 이어진 줄을 모아 선 {p(자리), s(시작), e(끝), t(굵기)} 로
+function scanRuns(mask,w,h,horiz,minLen,gap){
+  var out=[], N=horiz?h:w, M=horiz?w:h, i,j,s,last;
+  for(i=0;i<N;i++){
+    s=-1; last=-1;
+    for(j=0;j<M;j++){
+      if(!mask[horiz?(i*w+j):(j*w+i)]) continue;
+      if(s<0) s=j; else if(j-last>gap+1){ if(last-s+1>=minLen) out.push([i,s,last]); s=j; }
+      last=j;
+    }
+    if(s>=0&&last-s+1>=minLen) out.push([i,s,last]);
+  }
+  return out;
+}
+function mergeRuns(rs,maxT){
+  var open=[], done=[], i,k,r,L,hit;
+  for(i=0;i<rs.length;i++){
+    r=rs[i]; hit=null;
+    for(k=open.length-1;k>=0;k--){
+      L=open[k];
+      if(r[0]-L.i1>2){ done.push(L); open.splice(k,1); continue; }
+      if(!hit&&Math.min(r[2],L.e)-Math.max(r[1],L.s)>0.6*Math.min(r[2]-r[1],L.e-L.s)) hit=L;
+    }
+    if(hit){ hit.i1=r[0]; if(r[1]<hit.s) hit.s=r[1]; if(r[2]>hit.e) hit.e=r[2]; }
+    else open.push({i0:r[0],i1:r[0],s:r[1],e:r[2]});
+  }
+  return done.concat(open).filter(function(L){ return L.i1-L.i0+1<=maxT; }).map(function(L){ return {p:(L.i0+L.i1+1)/2,s:L.s,e:L.e+1,t:L.i1-L.i0+1}; });
+}
+function joinLines(ls,gapMax){   // 한 줄 위에 놓인 긴 선 조각들을 이음 — 날개 사이 홈처럼 잠깐 끊긴 테두리도 한 선으로 봄
+  var out=[], used=[], i, j, L, M, n, sum, grown;
+  for(i=0;i<ls.length;i++){
+    if(used[i]) continue;
+    used[i]=1; L={p:ls[i].p,s:ls[i].s,e:ls[i].e,t:ls[i].t}; n=1; sum=L.p; grown=true;
+    while(grown){
+      grown=false;
+      for(j=0;j<ls.length;j++){
+        M=ls[j]; if(used[j]||Math.abs(M.p-L.p)>1.5||M.s>L.e+gapMax||M.e<L.s-gapMax) continue;
+        used[j]=1; if(M.s<L.s) L.s=M.s; if(M.e>L.e) L.e=M.e; if(M.t>L.t) L.t=M.t; sum+=M.p; n++; L.p=sum/n; grown=true;
+      }
+    }
+    out.push(L);
+  }
+  return out;
+}
+function findLines(cv){
+  var w=cv.width, h=cv.height, px;
+  try{ px=cv.getContext('2d').getImageData(0,0,w,h).data; }catch(e){ return {H:[],V:[],H2:[],V2:[]}; }
+  var n=w*h, lum=new Uint8Array(n), mh=new Uint8Array(n), mv=new Uint8Array(n), i, j, x, y, v, T=28;
+  for(i=0,j=0;i<n;i++,j+=4) lum[i]=(px[j]*299+px[j+1]*587+px[j+2]*114)/1000;
+  // '가는 선' 점만 고름: 선을 가로지르는 쪽으로 2점(또는 4점) 떨어진 양옆이 둘 다 더 밝은 점 — 줄여서 흐려진 회색 선도 잡고, 넓게 칠한 곳은 빠짐
+  for(y=4;y<h-4;y++){
+    for(x=4,i=y*w+4;x<w-4;x++,i++){
+      v=lum[i]+T;
+      if((v<=lum[i-2*w]&&v<=lum[i+2*w])||(v<=lum[i-4*w]&&v<=lum[i+4*w])) mh[i]=1;
+      if((v<=lum[i-2]&&v<=lum[i+2])||(v<=lum[i-4]&&v<=lum[i+4])) mv[i]=1;
+    }
+  }
+  var big=Math.max(w,h), minLen=Math.round(big*0.05), maxT=Math.max(6,Math.round(big*0.004)), gapMax=big*0.015, g2=Math.max(6,Math.round(big*0.006));
+  var mk=function(m,horiz,gap){ return joinLines(mergeRuns(scanRuns(m,w,h,horiz,minLen,gap),maxT),gapMax); };
+  return {H:mk(mh,true,3),V:mk(mv,false,3),H2:mk(mh,true,g2),V2:mk(mv,false,g2)};   // H2·V2 = 점선도 이어서 본 것(실선으로 못 찾았을 때만 씀)
+}
+// A-1형 전개도의 선 짜임 찾기: 위·아래 가로선 + 양 끝 세로선 + 위아래로 대칭인 가로 괘선 둘 + 한가운데 세로선 + 장|폭 경계 세로선 둘(간격이 전체의 절반) + 날개 높이 ≒ 폭의 절반
+function findA1(H,V,w,h){
+  var tol=Math.max(3,0.003*Math.max(w,h)), best=null, i,j,a,b,k;
+  var covers=function(L,p,q){ return L.s<=p+tol&&L.e>=q-tol; };
+  var vAt=function(x,p,q,t){ var r=null, bd=t; V.forEach(function(v){ var dd=Math.abs(v.p-x); if(dd<=bd&&covers(v,p,q)){ bd=dd; r=v; } }); return r; };
+  var Hs=H.filter(function(L){ return L.e-L.s>=0.25*w; }).sort(function(p,q){ return p.p-q.p; });
+  for(i=0;i<Hs.length;i++) for(j=i+1;j<Hs.length;j++){
+    var top=Hs[i], bot=Hs[j]; if(bot.p-top.p<0.08*h) continue;
+    if(Math.abs(top.s-bot.s)>tol||Math.abs(top.e-bot.e)>tol) continue;
+    var y0=top.p, y1=bot.p, vl=vAt((top.s+bot.s)/2,y0,y1,tol*1.5), vr=vAt((top.e+bot.e)/2,y0,y1,tol*1.5); if(!vl||!vr) continue;
+    var x0=vl.p, x1=vr.p, mid=(x0+x1)/2;
+    var inner=Hs.filter(function(L){ return L.p>y0+tol&&L.p<y1-tol&&covers(L,x0,x1); });
+    for(a=0;a<inner.length;a++) for(b=a+1;b<inner.length;b++){
+      var ha=inner[a], hb=inner[b]; if(Math.abs((ha.p-y0)-(y1-hb.p))>tol*1.5) continue;
+      if(!vAt(mid,ha.p,hb.p,tol)) continue;
+      for(k=0;k<V.length;k++){
+        var va=V[k]; if(va.p<=x0+tol||va.p>=mid-tol||!covers(va,ha.p,hb.p)) continue;
+        if(!vAt(va.p+(mid-x0),ha.p,hb.p,tol*1.5)) continue;
+        var Wp=mid-va.p, Fp=ha.p-y0; if(Math.abs(Fp-Wp/2)>Math.max(tol*1.5,0.04*Wp)) continue;
+        var area=(x1-x0)*(y1-y0);
+        if(!best||area>best.area) best={x0:x0,y0:y0,x1:x1,y1:y1,xa:va.p,ya:ha.p,yb:hb.p,area:area};
+      }
+    }
+  }
+  return best;
+}
+function defaultFit(){ var d=S.d, a=S.art, asp=(d.Wd-d.G)/d.Ht, fw=a.w*0.8, fh=fw/asp; if(fh>a.h*0.8){ fh=a.h*0.8; fw=fh*asp; } var x0=(a.w-fw)/2, y0=(a.h-fh)/2; return {x0:x0,y0:y0,x1:x0+fw,y1:y0+fh}; }
+// 손으로 맞춘 자리 기억(이 기기) — 품목에 붙여 둔 사양서일 때만
+function fitKey(){ return (S&&S.o&&S.o.hash)?('b3_fit_'+S.o.hash):''; }
+function fitLoad(a){ var k=fitKey(); if(!k) return null; try{ var v=JSON.parse(lsGet(k)||'null'); if(v&&v.w===a.w&&v.h===a.h&&+v.x1>+v.x0&&+v.y1>+v.y0&&+v.x0>=0&&+v.y0>=0&&+v.x1<=a.w&&+v.y1<=a.h) return {x0:+v.x0,y0:+v.y0,x1:+v.x1,y1:+v.y1}; }catch(e){} return null; }
+function fitSave(){ var k=fitKey(), a=S&&S.art; if(!k||!a||!a.saved||!a.fit) return; lsSet(k,JSON.stringify({w:a.w,h:a.h,x0:r1(a.fit.x0),y0:r1(a.fit.y0),x1:r1(a.fit.x1),y1:r1(a.fit.y1)})); }
+function fitForget(){ var k=fitKey(); if(k&&S&&S.art&&S.art.saved) lsSet(k,null); }
+function autoFit(){
+  var a=S&&S.art; if(!a) return false;
+  var r=findA1(a.H,a.V,a.w,a.h)||findA1(a.H2,a.V2,a.w,a.h);
+  if(r){ a.fit={x0:r.x0,y0:r.y0,x1:r.x1,y1:r.y1}; a.det=r; a.auto=true; a.manual=false; }
+  else { a.auto=false; a.det=null; if(!a.fit) a.fit=defaultFit(); }
+  applyArt(); return !!r;
+}
+function say(t,warn){ var e=$('b3_msg'); if(!e) return; e.textContent=t; e.className='b3-msg'+(warn?' warn':''); }
+function status(){
+  var a=S&&S.art; if(!a||!a.fit) return;
+  var d=S.d, tail=a.saved?'':' 여기서 올린 그림은 보기만 하고 저장하지 않습니다.';
+  if(a.auto&&a.det){   // 자동으로 찾았을 때: 그림 속 안쪽 선이 치수로 계산한 자리와 맞는지
+    var m=artMap(), r=a.det, lim=Math.max(1.6,2.2/Math.min(m.kx,m.ky));
+    var off=Math.max(Math.abs((r.xa-r.x0)/m.kx-d.L),Math.abs(((r.x0+r.x1)/2-r.xa)/m.kx-d.W),Math.abs((r.ya-r.y0)/m.ky-d.F),Math.abs((r.yb-r.ya)/m.ky-d.H));
+    if(off>lim) say('그림에서 전개도는 찾았는데, 치수('+r1(d.L)+'×'+r1(d.W)+'×'+r1(d.H)+')가 그림 속 전개도와 맞지 않습니다. 장·폭·고나 사양서를 확인해 주세요.'+tail,true);
+    else say('그림에서 전개도를 찾아 상자에 입혔습니다.'+tail);
+  }
+  else if(a.manual) say('손으로 맞춘 자리대로 입혔습니다'+(a.saved&&fitKey()?'(이 기기에 기억해 둠)':'')+'. [자동으로 맞추기]를 누르면 다시 찾습니다.'+tail);
+  else say('그림에서 A-1형 전개도를 자동으로 찾지 못했습니다. A-1형 상자라면 아래 그림의 모서리 ● 네 개를 전개도 바깥 모서리(미미는 빼고)에 끌어다 맞춰 주세요(다른 형태의 상자는 아직 접어 볼 수 없습니다).'+tail,true);
+}
+function drawFit(){   // 올린 그림 위에 계산한 전개도를 겹쳐 그림 + 모서리 손잡이
+  var a=S&&S.art, ov=$('b3_fitov'); if(!a||!a.fit||!ov) return;
+  var d=S.d, f=a.fit, m=artMap();
+  var X=function(x){ return r1((x-m.left)*m.kx); }, Y=function(y){ return r1((y-m.top)*m.ky); };
+  var poly='M'+d.outline.map(function(q){ return X(q[0])+' '+Y(q[1]); }).join(' L')+' Z';
+  var s='<path class="dimr" fill-rule="evenodd" d="M0 0H'+(+a.w)+'V'+(+a.h)+'H0Z '+poly+'"/>';
+  d.crease.forEach(function(g){ s+='<line class="or" x1="'+X(g[0])+'" y1="'+Y(g[1])+'" x2="'+X(g[2])+'" y2="'+Y(g[3])+'"/>'; });
+  s+='<path class="oc" d="'+poly+'"/>';
+  ov.setAttribute('viewBox','0 0 '+(+a.w)+' '+(+a.h)); ov.innerHTML=s;
+  Array.prototype.forEach.call(S.ov.querySelectorAll('.b3-hd'),function(hd){ var c=hd.getAttribute('data-c'); hd.style.left=((c.charAt(1)==='l'?f.x0:f.x1)/a.w*100)+'%'; hd.style.top=((c.charAt(0)==='t'?f.y0:f.y1)/a.h*100)+'%'; });
+}
+function drawFlat(){   // 전개도(치수 + 디자인 입힌 모습)
+  if(!S) return; var host=$('b3_flat'); if(!host) return;
+  var d=S.d, a=S.art, hasArt=!!(a&&a.fit), cw=Math.max(240,host.clientWidth||480), fsPx=cw<430?9.5:11;
+  var k0=cw/(d.Wd*1.1), f0=fsPx/k0, ml=f0*2.3, mr=f0*0.5, mt=f0*2.2, mb=f0*0.5;
+  var vbW=d.Wd+ml+mr, vbH=d.Ht+mt+mb, fs=fsPx/(cw/vbW), x=d.x, y=d.y, s='', i;
+  var oPath='M'+d.outline.map(function(q){ return r2(q[0])+' '+r2(q[1]); }).join(' L')+' Z';
+  s+='<path d="'+oPath+'" fill="'+(S.board==='white'?'#F4F1E9':(hasArt?'#DCC195':'#F4E6CC'))+'"/>';
+  if(hasArt){ var m=artMap(); s+='<clipPath id="b3_clip"><path d="'+oPath+'"/></clipPath><g clip-path="url(#b3_clip)" style="mix-blend-mode:multiply"><image id="b3_flatimg" x="'+r2(m.left)+'" y="'+r2(m.top)+'" width="'+r2(a.w/m.kx)+'" height="'+r2(a.h/m.ky)+'" preserveAspectRatio="none"/></g>'; }
+  d.crease.forEach(function(g){ s+='<line class="crease" x1="'+r2(g[0])+'" y1="'+r2(g[1])+'" x2="'+r2(g[2])+'" y2="'+r2(g[3])+'"/>'; });
+  s+='<path class="cut" d="'+oPath+'"/>';
+  var ty=-fs*0.55, w5=[d.G,d.L,d.W,d.L,d.W], lx=-fs*0.55, h3=[d.F,d.H,d.F];
+  s+='<line class="dim" x1="'+r2(x[0])+'" y1="'+r2(ty)+'" x2="'+r2(x[5])+'" y2="'+r2(ty)+'"/>';
+  for(i=0;i<=5;i++) s+='<line class="dim" x1="'+r2(x[i])+'" y1="'+r2(ty-fs*0.3)+'" x2="'+r2(x[i])+'" y2="'+r2(ty+fs*0.3)+'"/>';
+  for(i=0;i<5;i++) s+='<text x="'+r2((x[i]+x[i+1])/2)+'" y="'+r2(ty-fs*0.85)+'" font-size="'+r2(fs)+'" text-anchor="middle" dominant-baseline="middle">'+r1(w5[i])+'</text>';
+  s+='<line class="dim" x1="'+r2(lx)+'" y1="'+r2(y[0])+'" x2="'+r2(lx)+'" y2="'+r2(y[3])+'"/>';
+  for(i=0;i<=3;i++) s+='<line class="dim" x1="'+r2(lx-fs*0.3)+'" y1="'+r2(y[i])+'" x2="'+r2(lx+fs*0.3)+'" y2="'+r2(y[i])+'"/>';
+  for(i=0;i<3;i++){ var cyy=(y[i]+y[i+1])/2; s+='<text x="'+r2(lx-fs*0.85)+'" y="'+r2(cyy)+'" font-size="'+r2(fs)+'" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 '+r2(lx-fs*0.85)+' '+r2(cyy)+')">'+r1(h3[i])+'</text>'; }
+  host.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+r2(-ml)+' '+r2(-mt)+' '+r2(vbW)+' '+r2(vbH)+'" role="img" aria-label="A-1형 전개도">'+s+'</svg>';
+  if(hasArt){ var im=$('b3_flatimg'); if(im) im.setAttribute('href',a.url); }   // 주소는 DOM 속성으로 (HTML 글자에 넣지 않음)
+  var sub=$('b3_flatsub'); if(sub) sub.textContent='전장 '+r1(d.Wd)+' · 재단 '+r1(d.Ht)+' (날개 '+r1(d.F)+' + 고 '+r1(d.H)+' + 날개 '+r1(d.F)+')'+(hasArt?' · 디자인 입힌 모습':'');
+}
+function applyArt(light){ if(!S) return; drawFit(); texAll(); if(!light){ drawFlat(); status(); } }
+function setArt(a,cv){
+  if(!S) return;
+  if(S.art) dropUrl(S.art.url);
+  var ln=findLines(cv); a.H=ln.H; a.V=ln.V; a.H2=ln.H2; a.V2=ln.V2; a.fit=null; a.auto=false; a.det=null; a.manual=false; S.art=a;
+  $('b3_pivot').style.setProperty('--b3-art','url("'+a.url+'")');
+  $('b3_fitimg').src=a.url; $('b3_fitbox').hidden=false; $('b3_two').classList.add('two'); $('b3_auto').hidden=false; $('b3_up').textContent='🖼 다른 그림으로 보기';
+  var mem=a.saved?fitLoad(a):null, ok=true;
+  if(mem){ a.fit=mem; a.manual=true; applyArt(); } else ok=autoFit();
+  if(ok) startPlay();
+  else { stopPlay(); try{ $('b3_fitbox').scrollIntoView({block:'nearest'}); }catch(e){} }
+}
+function toCanvas(src,w,h,mime,saved,my,st){
+  var bad=function(){ if(live(st)&&my===st.seq){ say('그림을 읽지 못했습니다. JPG·PNG 그림인지 확인해 주세요.',true); if(saved&&!st.art) startPlay(); } };
+  if(!w||!h){ bad(); return; }
+  var k=Math.min(1,2600/Math.max(w,h)), cw=Math.max(1,Math.round(w*k)), ch=Math.max(1,Math.round(h*k));   // 너무 큰 그림은 줄여서 씀
+  var cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+  var cx=cv.getContext('2d',{willReadFrequently:true}); cx.fillStyle='#fff'; cx.fillRect(0,0,cw,ch); cx.imageSmoothingQuality='high';
+  try{ cx.drawImage(src,0,0,cw,ch); }catch(e){ bad(); return; }
+  var put=function(u){ if(!live(st)||my!==st.seq){ dropUrl(u); return; } setArt({url:u,w:cw,h:ch,saved:saved},cv); };
+  var asData=function(){ var du=''; try{ du=cv.toDataURL(mime,0.95); }catch(e){} if(du) put(du); else bad(); };
+  if(!cv.toBlob){ asData(); return; }
+  cv.toBlob(function(b){   // 화면에 쓸 주소는 짧은 blob 주소로(면 13개의 배경에 쓰임) — 막힌 곳에서는 data 주소로
+    if(!b){ asData(); return; }
+    var u=URL.createObjectURL(b), probe=new Image();
+    probe.onload=function(){ put(u); };
+    probe.onerror=function(){ dropUrl(u); asData(); };
+    probe.src=u;
+  },mime,0.95);
+}
+var MSG_PDF='붙여 둔 인쇄사양서가 PDF 라서 디자인은 입히지 못했습니다(상자 모양만). 사양서를 그림(JPG·PNG)으로 붙이거나 [그림 올려서 보기]를 쓰세요.';
+function loadSrc(data,saved){   // data: data 주소(그림) · saved: 품목에 붙여 둔 사양서인가
+  if(!S) return;
+  data=String(data||'');
+  if(!/^data:image\//i.test(data)){ say(/^data:application\/pdf/i.test(data)?MSG_PDF:'그림 파일(JPG·PNG)이 아니라서 디자인은 입히지 못했습니다.',true); if(saved&&!S.art) startPlay(); return; }
+  var st=S, my=++st.seq, im=new Image();
+  im.onload=function(){ if(!live(st)||my!==st.seq) return; toCanvas(im,im.naturalWidth,im.naturalHeight,/^data:image\/png/i.test(data)?'image/png':'image/jpeg',saved,my,st); };
+  im.onerror=function(){ if(!live(st)||my!==st.seq) return; say('그림을 읽지 못했습니다. JPG·PNG 그림인지 확인해 주세요.',true); if(saved&&!st.art) startPlay(); };
+  im.src=data;
+}
+function loadFile(file){
+  if(!S||!file) return;
+  var type=String(file.type||''), name=String(file.name||'');
+  if(!/^image\//.test(type)&&!/\.(jpe?g|png|webp|gif|bmp)$/i.test(name)){ say((/pdf$/i.test(type)||/\.pdf$/i.test(name))?'PDF 는 아직 읽지 못합니다. 그림(JPG·PNG)으로 저장해서 올려 주세요.':'그림 파일(JPG·PNG)을 올려 주세요.',true); return; }
+  if(file.size>30*1048576){ say('그림이 너무 큽니다(30MB 까지).',true); return; }
+  say('그림을 읽는 중입니다…');
+  var st=S, fr=new FileReader();
+  fr.onload=function(){ if(live(st)) loadSrc(fr.result,false); };
+  fr.onerror=function(){ if(live(st)) say('그림을 읽지 못했습니다.',true); };
+  fr.readAsDataURL(file);
+}
+// 모서리 끌기: 가까운 선이 있으면 그 선에 붙음(손가락으로도 정확히 맞게) · 화살표 키는 1점씩(Shift 는 10점)
+function snapTo(lines,v,other,rad){ var best=v, bd=rad; lines.forEach(function(L){ var dd=Math.abs(L.p-v); if(dd<bd&&other>=L.s-rad*2&&other<=L.e+rad*2){ bd=dd; best=L.p; } }); return best; }
+function moveCorner(c,x,y,snap){
+  var a=S&&S.art; if(!a||!a.fit) return;
+  var f=a.fit, minW=Math.max(24,a.w*0.05), minH=Math.max(24,a.h*0.05);
+  if(snap>0){ var sx=snapTo(a.V,x,y,snap), sy=snapTo(a.H,y,x,snap); x=sx; y=sy; }
+  x=clamp(x,0,a.w); y=clamp(y,0,a.h);
+  if(c.charAt(1)==='l') f.x0=Math.min(x,f.x1-minW); else f.x1=Math.max(x,f.x0+minW);
+  if(c.charAt(0)==='t') f.y0=Math.min(y,f.y1-minH); else f.y1=Math.max(y,f.y0+minH);
+  a.auto=false; a.det=null; a.manual=true;
+}
+function artSoon(){ if(!S||S.artRaf) return; var st=S; st.artRaf=requestAnimationFrame(function(){ st.artRaf=0; if(live(st)) applyArt(true); }); }
+function artDone(){ if(!S) return; if(S.artRaf){ cancelAnimationFrame(S.artRaf); S.artRaf=0; } fitSave(); applyArt(); }
+
+// ── 4. 창 열기·닫기 ──
+function close(){
+  var s=S; S=null;
+  if(s){
+    if(s.playing) cancelAnimationFrame(s.playing); if(s.raf) cancelAnimationFrame(s.raf); if(s.artRaf) cancelAnimationFrame(s.artRaf);
+    try{ if(s.ro) s.ro.disconnect(); }catch(e){}
+    if(s.art) dropUrl(s.art.url);
+  }
+  var old=$('b3_ov'); if(old) old.remove();
+}
+function wire(){
+  var ov=S.ov, stage=$('b3_stage');
+  ov.querySelector('.k-x').onclick=close;
+  $('b3_fold').addEventListener('input',function(){ stopPlay(); setFold(this.value/100,true); });
+  $('b3_play').addEventListener('click',play);
+  $('b3_up').addEventListener('click',function(){ $('b3_file').click(); });
+  $('b3_file').addEventListener('change',function(){ var f=this.files&&this.files[0]; this.value=''; if(f) loadFile(f); });
+  $('b3_auto').addEventListener('click',function(){ if(!S||!S.art) return; if(autoFit()) fitForget(); else say('그림에서 전개도 선을 자동으로 찾지 못했습니다. 모서리 ● 을 끌어서 맞춰 주세요.',true); });
+  Array.prototype.forEach.call(ov.querySelectorAll('input[name=b3_board]'),function(rb){
+    rb.checked=(rb.value===S.board);
+    rb.addEventListener('change',function(){ if(!S||!rb.checked) return; S.board=rb.value; lsSet('b3_board',S.board); build3d(); drawFlat(); });
+  });
+  // 끌어서 돌리기: 손가락은 좌우만(위아래는 화면 넘기기), 마우스는 위아래로 기울이기도
+  var drag=null;
+  stage.addEventListener('pointerdown',function(e){ if(!S) return; drag={x:e.clientX,y:e.clientY,rx:S.view.rx,ry:S.view.ry,mouse:e.pointerType==='mouse'}; try{ stage.setPointerCapture(e.pointerId); }catch(x){} });
+  stage.addEventListener('pointermove',function(e){ if(!drag||!S) return; S.view.ry=drag.ry+(e.clientX-drag.x)*0.45; if(drag.mouse) S.view.rx=clamp(drag.rx-(e.clientY-drag.y)*0.35,-80,80); applyFold(); });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(function(n){ stage.addEventListener(n,function(){ drag=null; }); });
+  stage.addEventListener('keydown',function(e){ if(!S) return; var k=e.key; if(k==='ArrowLeft') S.view.ry-=8; else if(k==='ArrowRight') S.view.ry+=8; else if(k==='ArrowUp') S.view.rx=clamp(S.view.rx-6,-80,80); else if(k==='ArrowDown') S.view.rx=clamp(S.view.rx+6,-80,80); else return; e.preventDefault(); applyFold(); });
+  Array.prototype.forEach.call(ov.querySelectorAll('.b3-hd'),function(hd){
+    var c=hd.getAttribute('data-c'), on=false;
+    hd.addEventListener('pointerdown',function(e){ if(!S||!S.art||!S.art.fit) return; on=true; try{ hd.setPointerCapture(e.pointerId); }catch(x){} e.preventDefault(); hd.focus(); });
+    hd.addEventListener('pointermove',function(e){
+      if(!on||!S||!S.art) return; var rc=$('b3_fitimg').getBoundingClientRect(); if(!rc.width||!rc.height) return;
+      moveCorner(c,(e.clientX-rc.left)/rc.width*S.art.w,(e.clientY-rc.top)/rc.height*S.art.h,7*S.art.w/rc.width); artSoon();
+    });
+    ['pointerup','pointercancel','lostpointercapture'].forEach(function(nm){ hd.addEventListener(nm,function(){ if(on){ on=false; artDone(); } }); });
+    hd.addEventListener('keydown',function(e){
+      var a=S&&S.art; if(!a||!a.fit) return; var k=e.key, stp=e.shiftKey?10:1, f=a.fit, x=(c.charAt(1)==='l')?f.x0:f.x1, y=(c.charAt(0)==='t')?f.y0:f.y1;
+      if(k==='ArrowLeft') x-=stp; else if(k==='ArrowRight') x+=stp; else if(k==='ArrowUp') y-=stp; else if(k==='ArrowDown') y+=stp; else return;
+      e.preventDefault(); e.stopPropagation(); moveCorner(c,x,y,0); artDone();
+    });
+  });
+  if(window.ResizeObserver){
+    var st=S, last=stage.clientWidth+'x'+stage.clientHeight;
+    st.ro=new ResizeObserver(function(){
+      if(S!==st) return; var now=stage.clientWidth+'x'+stage.clientHeight; if(now===last) return; last=now;
+      cancelAnimationFrame(st.raf); st.raf=requestAnimationFrame(function(){ st.raf=0; if(live(st)){ build3d(); drawFlat(); } });
+    });
+    st.ro.observe(stage);
+  }
+}
+// o: {L,W,H(mm), flute, title, hash(사양서 해시), spec(data 주소) 또는 specP(Promise→data 주소 또는 ''), from:'item'|'form'|'calc'}
+function open(o){
+  close();
+  if(typeof _kOverlay!=='function') return;
+  ensureStyle();
+  var ov=_kOverlay('b3_ov','🧊 3D로 접어 보기','#4E342E',1040), body=ov.querySelector('.k-body');
+  body.classList.add('b3'); body.innerHTML=HTML;
+  S={ov:ov,o:o,d:calc(o.L,o.W,o.H),art:null,board:(lsGet('b3_board')==='white')?'white':'kraft',fold:0.74,view:{rx:-22,ry:-30},faces:[],geo:null,playing:0,raf:0,artRaf:0,seq:0,ro:null,colOut:[198,156,99],colIn:[220,193,149]};
+  var st=S;
+  $('b3_name').textContent=o.title||'';
+  $('b3_dims').textContent='장 '+r1(o.L)+' × 폭 '+r1(o.W)+' × 고 '+r1(o.H)+(o.flute?' · '+o.flute:'')+' · A-1형으로 접은 모습';
+  $('b3_note').textContent='A-1형 기준입니다(미미 40mm · 원단 두께는 그리지 않음). 다른 형태의 상자는 실제 모양과 다릅니다. 색은 화면용이라 실제 인쇄 색과 다르고, 그림은 이 기기 안에서만 씁니다.';
+  wire(); build3d(); drawFlat();
+  var none=(o.from==='calc')?'[그림 올려서 보기]로 인쇄 사양서나 전개도 그림(JPG·PNG)을 올리면 디자인을 입혀서 접어 봅니다. 올린 그림은 보기만 하고 저장하지 않습니다.'
+    :'붙여 둔 인쇄사양서가 없어 상자 모양만 보여 드립니다. 제품 창에서 사양서 그림(JPG·PNG)을 붙이면 디자인이 입혀집니다 — [그림 올려서 보기]로 잠깐 입혀 볼 수도 있습니다.';
+  if(o.spec){ loadSrc(o.spec,true); }
+  else if(o.specP&&typeof o.specP.then==='function'){
+    say('☁️ 인쇄사양서를 불러오는 중…');
+    var my=++st.seq;
+    o.specP.then(function(dv){
+      if(!live(st)||my!==st.seq) return;
+      if(dv){ if(!o.hash&&typeof bkHash==='function'){ try{ o.hash=String(bkHash(dv)); }catch(e){} } loadSrc(dv,true); }
+      else { say(o.hash?'붙여 둔 인쇄사양서를 불러오지 못했습니다(다른 기기에서 붙인 사양서는 로그인·인터넷 연결이 필요). 상자 모양만 보여 드립니다.':none,!!o.hash); startPlay(); }
+    },function(){ if(live(st)&&my===st.seq){ say('인쇄사양서를 불러오지 못했습니다. 상자 모양만 보여 드립니다.',true); startPlay(); } });
+  }
+  else { say(none); startPlay(); }
+}
+function dimsOk(L,W,H){ return [L,W,H].every(function(v){ return isFinite(v)&&v>=10&&v<=5000; }); }
+function openItem(m){
+  if(!m||typeof m!=='object'){ toast('품목을 찾지 못했습니다.'); return; }
+  var L=+m.jang||0, W=+m.pok||0, H=+m.go||0;
+  if(!dimsOk(L,W,H)){ toast('이 품목에는 장·폭·고가 없어 3D로 접어 볼 수 없습니다. 제품 창에서 치수를 넣어 주세요.'); return; }
+  var h=(m.spec&&m.spec.hash)?String(m.spec.hash):'', has=!!h;
+  if(!has){ try{ has=!!specLocalGet(m); }catch(e){} }
+  open({L:L,W:W,H:H,flute:String(m.flute||''),title:String(m.product||''),hash:h,specP:has?specLoad(m):null,from:'item'});
+}
+function openMaster(idx){ var list=[]; try{ list=loadData('master'); }catch(e){} openItem(Array.isArray(list)?list[idx]:null); }
+function openOrder(){ var m=window._b3OrderItem; if(!m){ toast('품명을 먼저 골라 주세요.'); return; } openItem(m); }
+function openForm(){   // 제품 창에서: 지금 창에 적힌 치수와 붙인 사양서(저장 전이라도)로
+  var g=function(id){ var e=$(id); return e?String(e.value||''):''; };
+  var L=+g('m_jang')||0, W=+g('m_pok')||0, H=+g('m_go')||0;
+  if(!dimsOk(L,W,H)){ toast('장·폭·고를 먼저 넣어 주세요.'); return; }
+  var se=$('m_spec_data'), data=se?String(se.value||''):'', stt=(se&&se.dataset&&se.dataset.state)||'', idx=parseInt(g('m_edit_idx'),10), m=null;
+  if(idx>=0){ try{ m=loadData('master')[idx]||null; }catch(e){} }
+  var h='';
+  if(data){ try{ h=String(bkHash(data)); }catch(e){} }
+  else if(m&&m.spec&&m.spec.hash&&stt!=='removed') h=String(m.spec.hash);
+  open({L:L,W:W,H:H,flute:g('m_flute'),title:g('m_product'),hash:h,spec:data,specP:(!data&&m&&stt!=='removed'&&((m.spec&&m.spec.hash)||specLocalGet(m)))?specLoad(m):null,from:'form'});
+}
+function openCalc(){
+  var sh=String(($('i_shape')||{}).value||'A-1형');
+  if(sh!=='A-1형'){ toast('3D로 접어 보기는 A-1형만 됩니다 (지금 고른 형태: '+sh+').'); return; }
+  var g=function(id){ var e=$(id); return e?(+e.value||0):0; };
+  var L=g('i_jang'), W=g('i_pok'), H=g('i_go');
+  if(!dimsOk(L,W,H)){ toast('장·폭·고를 먼저 넣어 주세요.'); return; }
+  open({L:L,W:W,H:H,flute:String(($('i_flute')||{}).value||''),title:'단가계산기에 넣은 상자',hash:'',from:'calc'});
+}
+return {open:open,close:close,openMaster:openMaster,openOrder:openOrder,openForm:openForm,openCalc:openCalc,_state:function(){ return S; },_calc:calc,_findLines:findLines,_findA1:findA1};
+})();
+function box3dOpenMaster(i){ box3d.openMaster(i); }
+function box3dOpenForm(){ box3d.openForm(); }
+function box3dOpenOrder(){ box3d.openOrder(); }
+function box3dOpenCalc(){ box3d.openCalc(); }
+
+// ══════════════════════════════════════
 // 전체 데이터 백업 / 복원
 // ══════════════════════════════════════
 // 변경이력(changelog)·휴지통(trash)도 함께 백업·복원 (예전엔 빠져 복원·기기 분실 때 사라졌음)
@@ -25803,12 +26321,12 @@ var HELP_TABS={
     m:['처음 쓸 때는 홈 위쪽 안내대로 거래처 → 제품 → 당사정보 순서로 넣으세요.','홈의 총 미수금은 수금관리와 같은 숫자입니다. 다르게 보이면 🩺 데이터 검진을 돌려 보세요.','💵 자금 흐름 카드: 이달·다음달에 받을 돈(수금 예정 — 결제조건·부가세 포함)과 줄 돈(매입 결제 예정 — 입고 매입 × 1.1, 머리줄의 매입 결제조건)·고정비·차이를 보여 줍니다. 수금을 넣지 않으면 받을 돈이 실제보다 크게 보입니다.','손익 현황의 영업이익은 손익분석 🏠 월 고정비를 넣으면 그 비용(이번 달은 일할)까지 뺀 값입니다.'],
     b:[['🩺 데이터 검진','health'],['🚶 하루 업무 따라하기','tour']]},
   tab_calc:{t:'💰 단가계산기',d:'상자 형태·치수(장·폭·고)·골·원지로 원단 크기(전장·재단)·㎡ 단가·매당 원가·밴딩수·적재 패턴·차량 적재를 계산합니다.',
-    s:['형태·장·폭·고·골형태·표면지·골심지·이면지를 넣습니다.','위쪽 결과(전장·재단(날개포함)·㎡ 단가·매당 원가)를 보고, 판매단가를 넣으면 마진율이 나옵니다.','㎡ 단가 = 원재료비 × 1.1 + 가공비. 가공비는 "📋 골형태별 단조율 · 가공비"의 [✏️ 가공비]에서 단골(SW)·이중골(DW) 따로 바꿀 수 있고(기본 110·130원/㎡) 저장하면 바로 반영됩니다.','아래에서 적재 패턴·차량별 최대 적재·파렛트 배치를 봅니다 (폰은 [펼치기]).'],
+    s:['형태·장·폭·고·골형태·표면지·골심지·이면지를 넣습니다.','위쪽 결과(전장·재단(날개포함)·㎡ 단가·매당 원가)를 보고, 판매단가를 넣으면 마진율이 나옵니다.','㎡ 단가 = 원재료비 × 1.1 + 가공비. 가공비는 "📋 골형태별 단조율 · 가공비"의 [✏️ 가공비]에서 단골(SW)·이중골(DW) 따로 바꿀 수 있고(기본 110·130원/㎡) 저장하면 바로 반영됩니다.','아래에서 적재 패턴·차량별 최대 적재·파렛트 배치를 봅니다 (폰은 [펼치기]).','✏️ 전개도 머리줄의 [🧊 3D로 접어 보기]: 지금 치수의 상자를 접은 모습으로 봅니다(A-1형만). 창의 [그림 올려서 보기]로 인쇄 사양서 그림을 올리면 디자인을 입혀 볼 수 있습니다(보기만 하고 저장하지 않음).'],
     m:['\'재단(날개포함)\'은 제품마스터·발주서와 같은 값입니다.','차량 적재 계산은 적재함 폭 2,350mm(5톤 장축 8.5M) 기준입니다. 실제 차량과 다르면 알려 주세요.'],
     b:[]},
   tab_order:{t:'📋 수주관리',d:'거래처에서 받은 주문(수주)을 넣습니다. 저장하면 발주관리에 "미발주" 줄이 생기고, 납기관리·홈 달력에 나옵니다.',
     s:['[+ 수주 입력] → 거래처·품명·수량·납기일(납품처) → 저장.','[📋 붙여넣기 입력]: 카톡·문자 내용이나 엑셀 발주서의 셀(PDF 는 글자 드래그)을 복사해 붙여 넣으면 거래처·품명·수량·납기일을 알아내어 미리보기로 보여 주고, [수주로 넣기]로 수주 창에 차례로 채워 저장합니다(자동 · 또는 한 건씩 확인). 수량이 없는 줄은 그 거래처의 최근 수주 수량, "3P"는 제품마스터의 1P 수량으로 채우고 노란 바탕으로 표시하니 확인하세요. 한 번 골라 준 품명은 그 거래처에 기억됩니다. [📎 PDF·사진 파일]로 발주서 PDF(글자가 든 것)나 카톡으로 온 발주서 사진도 읽습니다 — 사진은 기기 안에서 글자를 읽는 실험 기능이라 10~30초 걸리고 틀린 글자가 있을 수 있으니 결과를 확인하세요(폰에서는 [📷 사진 찍기]도 됨 · 그림을 글 칸에 붙여 넣어도 됨). 작은 사진은 못 읽을 수 있으니 원본 크기로.','검색칸 옆 "수주일자" 기간(시작~끝)으로 그 기간에 받은 수주만 봅니다 — [이번 달]·[지난 달]·[최근 30일]·[전체] 버튼. 고른 기간은 이 기기에 기억되고(다른 화면에 갔다 와도·앱을 다시 열어도 그대로), 위 카드 숫자는 기간과 상관없이 전체입니다. 기간·검색·상태가 걸려 있으면 [📥 엑셀 다운]은 화면에 보이는 줄만 받습니다(파일 이름 끝에 기간이 붙음).','저장하면 같은 거래처·날짜로 창이 다시 열려 다음 품목을 이어서 넣습니다. 다 넣었으면 [닫기].','창고 재고로 바로 납품하면 "📦 재고에서 출고(발주 안 함)"를 고르세요 — 발주·입고 줄을 만들지 않습니다.','늘 같은 품목을 주문하는 거래처는 수주 창의 [🔁 최근 수주]로 전에 주문한 품목·수량(단가)을 골라 채웁니다.','특가·견적 단가로 받은 수주는 창의 "💰 단가(이번 수주)" 칸에 넣으세요 — 출고 창에 그 단가가 미리 들어가고 그 출고는 그 단가로 고정됩니다(비우면 제품마스터 단가). 견적서의 [📋 수주로]가 견적 단가를 여기에 넣습니다.','단가 칸 옆에 마진(판매단가 − 제품마스터 매입단가)이 보이고, 5% 이하면 빨갛게 ⚠️ 표시되며 저장 뒤에도 빨간 안내가 뜹니다(저장은 됩니다 — 초도·샘플처럼 일부러 낮게 받는 경우).','PC 에서는 목록 머리글을 누르면 정렬, 우클릭으로 안 쓰는 열 숨기기, 머리글 끝을 끌어 열 폭(이 기기에 기억 — 다른 목록도 같음).','목록 위 상태 상자에서 "🚚 미완료"를 고르면 아직 나갈 수량이 남은 수주만 보입니다(끝난 수주는 "✅ 완료"). 고른 상태는 이 기기에 기억됩니다.'],
-    m:['발주서를 낸 수주는 잠깁니다. 수량·품명을 바꾸려면 발주관리에서 [발주취소] 뒤 [수정], 납기일·납품처는 [📅 납기·납품처]로 언제든.','지운 수주는 🕘 이력 → 🗑 휴지통에서 되살릴 수 있습니다.'],
+    m:['발주서를 낸 수주는 잠깁니다. 수량·품명을 바꾸려면 발주관리에서 [발주취소] 뒤 [수정], 납기일·납품처는 [📅 납기·납품처]로 언제든.','지운 수주는 🕘 이력 → 🗑 휴지통에서 되살릴 수 있습니다.','수주 창에서 품명을 고르면 창 위쪽에 그 품목의 인쇄사양서가 뜹니다 — 그 머리줄의 [🧊 3D로 접어 보기]로 디자인을 입힌 상자의 접은 모습을 볼 수 있습니다.'],
     b:[['+ 수주 입력','order']]},
   tab_po:{t:'🛒 발주관리',d:'수주로 생긴 "미발주" 줄을 발주처에 발주(발주서)합니다. 수주 없이 재고를 채우는 [＋ 재고용 발주]도 여기서.',
     s:['같은 발주처의 미발주 줄을 체크 → [발주] → 수량 확인(나눠 발주하려면 수량을 줄임).','검색칸 옆 "발주일" 기간으로 그 기간에 발주한 줄만 봅니다(발주완료 줄은 발주서를 낸 날, 미발주 줄은 수주일) — [이번 달]·[지난 달]·[최근 30일]·[전체] 버튼. 고른 기간은 이 기기에 기억되고(다른 화면에 갔다 와도·앱을 다시 열어도 그대로), 위 카드 숫자는 기간과 상관없이 전체입니다. 기간·검색·상태가 걸려 있으면 [📥 엑셀 다운]은 화면에 보이는 줄만 받습니다(파일 이름 끝에 기간이 붙음).','출력 방식: 🖼️ 이미지(JPEG, 폰·카톡 전송) · 🖨️ 프린터 인쇄 · 📄 PDF로 저장. 발주서에 단가·금액을 넣을지 고릅니다.','이미 낸 발주서는 줄의 [재출력]으로 다시 뽑습니다.'],
@@ -25823,7 +26341,7 @@ var HELP_TABS={
     m:['↩ 는 그 줄의 출고 한 번만 취소합니다. 모자라게 나가고 끝났으면 [✂️ 잔량 마감].','🔒 가 붙은 줄은 마감한 달의 출고입니다 — 고치려면 마감관리에서 그 달 [마감취소]가 먼저입니다.'],
     b:[['📷 QR 출고','qr']]},
   tab_master:{t:'🏢 제품마스터',d:'거래처별 제품(품명·치수·원지·판매단가·발주처·매입단가·적재)을 등록합니다. 수주 창의 품명 목록이 여기서 나옵니다.',
-    s:['왼쪽(폰은 위쪽)에서 거래처를 고르고 [+ 제품 등록] → 저장.','🧷 공용 품목: 스트레치필름·밴딩끈처럼 모든 거래처에 파는 품목은 왼쪽 "🧷 공용 품목"을 고르고 [+ 제품 등록](창의 "공용 품목" 체크). 단위(박스·롤 등)와 기본 판매단가를 넣고, 다르게 받는 거래처는 "거래처별 단가"에 추가. 어느 거래처의 수주·출고에서도 품명 목록 끝에 [공용]으로 나오고, 재고는 하나로 묶여 재고용 발주([거래처]에서 "(공용)")로 채우고 어느 거래처로든 "재고에서 출고"합니다.','이미 거래처마다 따로 등록한 랩·밴딩끈은 [🧷 공용으로 묶기]로 한 번에 — 거래처별 단가는 옮겨지고 원래 제품은 사용 중지로 남으며 그 재고는 공용 재고로 이어집니다.','단가가 바뀌면 [수정](적용 시작일) 또는 [📅예약](앞으로 바뀔 단가). [📈이력]으로 지난 단가를 봅니다.','거래처에 보낼 단가표는 [📄 단가표] — 품명·규격·현재 단가·적용일·예정 단가가 한 장으로(인쇄·그림으로 저장).'],
+    s:['왼쪽(폰은 위쪽)에서 거래처를 고르고 [+ 제품 등록] → 저장.','🧷 공용 품목: 스트레치필름·밴딩끈처럼 모든 거래처에 파는 품목은 왼쪽 "🧷 공용 품목"을 고르고 [+ 제품 등록](창의 "공용 품목" 체크). 단위(박스·롤 등)와 기본 판매단가를 넣고, 다르게 받는 거래처는 "거래처별 단가"에 추가. 어느 거래처의 수주·출고에서도 품명 목록 끝에 [공용]으로 나오고, 재고는 하나로 묶여 재고용 발주([거래처]에서 "(공용)")로 채우고 어느 거래처로든 "재고에서 출고"합니다.','이미 거래처마다 따로 등록한 랩·밴딩끈은 [🧷 공용으로 묶기]로 한 번에 — 거래처별 단가는 옮겨지고 원래 제품은 사용 중지로 남으며 그 재고는 공용 재고로 이어집니다.','단가가 바뀌면 [수정](적용 시작일) 또는 [📅예약](앞으로 바뀔 단가). [📈이력]으로 지난 단가를 봅니다.','거래처에 보낼 단가표는 [📄 단가표] — 품명·규격·현재 단가·적용일·예정 단가가 한 장으로(인쇄·그림으로 저장).','품목 줄의 [🧊3D]: 그 품목을 접은 모습으로 봅니다(A-1형 기준). 제품 창에 인쇄사양서를 그림(JPG·PNG)으로 붙여 두었으면 사양서 속 전개도를 찾아 디자인을 상자 겉면에 입혀 줍니다 — [▶ 접는 모습] · 그림을 끌어 돌리기 · 원단 겉면(크라프트/백색). 전개도를 못 찾으면 창 아래 사양서 그림의 모서리 ● 을 끌어 맞추면 되고(이 기기에 기억), 사양서가 PDF 면 상자 모양만 나옵니다. 제품 창의 인쇄사양서 칸에 있는 [🧊 3D로 접어 보기]는 저장 전에도 볼 수 있습니다.'],
     m:['판매단가·매입단가를 넣으면 그 아래에 마진(원·%)이 보이고 5% 이하면 빨갛게 ⚠️ 표시됩니다.','단가를 지난 날짜부터 바꾸면 이미 출고한 건도 바꿀지 묻습니다(마감한 달은 그대로).','매입단가를 바꾸면 적용 시작일을 묻고, 그 날짜 이후 이미 입고한 건의 매입단가도 바꿀지 묻습니다 — 바꾸면 매입원장과 그 수주로 나간 출고의 원가(손익)가 함께 바뀝니다(마감한 달은 그대로). 발주처 단가가 소급 인상·인하될 때 쓰세요.','품명을 바꾸면 지난 기록은 옛 품명 그대로 남습니다(확인창). 안 쓰는 제품은 지우지 말고 [사용 중지].'],
     b:[['+ 제품 등록','master_new']]},
   tab_client:{t:'🏬 거래처등록',d:'파는 곳(매출처)과 사는 곳(발주처)을 등록합니다 — 상호·사업자번호·결제조건·여신 한도·세금계산서 발행 대상·납품처.',
@@ -25900,7 +26418,7 @@ var HELP_FIX=[
   {k:'relogin',t:'로그인 화면에 "로그인 유지 기한이 지나…" · "접속을 끊었습니다"가 떠요',s:['👥 팀 창의 "로그인 유지 기한"(기본 30일)이 지났거나 소유자·관리자가 그 기기의 [접속 끊기]를 누른 것입니다 — 그냥 다시 로그인하면 됩니다. 자료는 그대로이고 올라가지 않았던 변경도 이어서 올라갑니다.','기한이 번거로우면 소유자가 👥 팀 창에서 "없음"으로 바꿀 수 있습니다.'],b:[['👥 팀·로그인','team']]}
 ];
 // 이번 판에서 바뀐 점 (README ⑩ v2.5.0 간추림)
-var H_VER_NOTES=['부가세는 모든 화면이 같은 기준입니다(공급가의 10% — v2.6.5부터 「세금계산서 발행 대상」 체크를 끈 거래처는 부가세 없음).','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억) · 제품마스터 매입단가를 바꿀 때 이미 입고한 건(열린 달)에도 소급할지 묻기.','v2.5.2: 거래처 수금조건에 마감후 30일·40일·45일 추가 (수금예정일 = 그 달 말일 + N일).','v2.5.3: 손익분석 🏠 월 고정비(월세·차량 등) → 홈·손익분석·차트·목표의 영업이익이 고정비까지 뺀 값으로 · 수주 창·제품마스터 창에 마진 표시, 5% 이하면 ⚠️(저장 뒤 빨간 안내) · 홈 💵 자금 흐름 카드(이달·다음달 받을 돈·줄 돈·고정비·차이, 매입 결제조건).','v2.5.4: 🧷 공용 품목 — 스트레치필름·밴딩끈처럼 모든 거래처에 파는 품목을 제품마스터에 한 번만 등록(단위 박스·롤 등 · 거래처별 단가 · 재고 하나) · 수주 창 품명 목록에 [공용] · 재고용 발주에 "(공용)" · 거래명세표·발주서·수주 목록에 단위 표시 · [공용으로 묶기].','v2.5.5: 📥 세금계산서로 과거 자료 넣기 — 홈택스 전자세금계산서 목록(매출·매입) 엑셀로 앱을 쓰기 전 달의 매출·매입을 거래처·월별 금액으로(수금관리·거래처 원장·매출원장·매입원장·손익·세금계산서 준비·부가세 자료에 "🧾 세금계산서" 줄) · 수금 목록 엑셀(거래처·청구연월·수금일·금액)로 그 달 수금 · 같은 승인번호·은행원문은 두 번 안 들어감 · [↩ 되돌리기].','v2.5.6: 수금관리 위쪽 표가 "📅 받을 돈 — 언제 받나"(달별)로 — 거래처마다 늦은 돈 · 이달(남은 날) · 다음 달 · … 칸에 "9월분 · 11/09"처럼 어느 달 매출을 언제 받는지 표시 · [⏱ 늦은 일수]로 예전 표 전환(기기에 기억).','v2.5.7: 엑셀 다운로드가 전부 진짜 엑셀 파일(.xlsx)로 — 매출원장·매입원장·손익분석·거래처 원장·부가세 매출처별/매입처별·세금계산서 대조표(예전엔 CSV 라 폰·일부 PC 에서 안 열리거나 글자가 깨졌음). 숫자 칸은 숫자(1,000 단위 표시)라 엑셀에서 바로 합계가 됩니다. 엑셀 라이브러리를 못 불러온 상태(오프라인 첫 실행)면 예전처럼 CSV 로 받고 안내가 뜹니다.','v2.5.8: 수주관리·발주관리·입고관리·납기관리 검색칸 옆에 기간(시작~끝) — 수주일자·발주일·입고일·납기일 기준, [이번 달]·[지난 달]·[최근 30일]·[전체] 버튼, 고른 기간은 기기에 기억. 기간·검색·상태가 걸려 있으면 [📥 엑셀 다운]은 보이는 줄만(파일 이름 끝에 기간). 전체 검색·데이터 검진·QR 로 찾아갈 때는 기간을 전체로 풀어 줌.','v2.5.9: 단가계산기 가공비(㎡당)를 "📋 골형태별 단조율 · 가공비"의 [✏️ 가공비]에서 바꿀 수 있음 — 단골(SW: A·B·E골)·이중골(DW: BA·BB·EB골) 따로, 기본 110·130원, 저장하면 ㎡ 단가·매당 원가·원지 인상 영향표에 바로 반영되고 다른 기기에도 함께. 오른쪽 아래 🤖 AI 도우미(외부 API 호출)는 뺐고 이 기기에 저장돼 있던 API 키는 지움.','v2.6.0: 📋 붙여넣기로 수주 입력 — 수주관리 [📋 붙여넣기 입력](수주 창에도 버튼): 카톡·문자 내용, 엑셀 발주서의 셀, PDF 발주서 글자를 붙여 넣으면 거래처(상호·관리상호)·수주일(발주일)·줄마다 품명(제품마스터와 맞춤)·수량(매·장·개, 3P는 1P 수량으로)·납기일(11월 10일·11/10)을 알아내어 미리보기 → [수주로 넣기]로 수주 창에 차례로 채워 자동 저장(한 건씩 확인도 됨). 수량 없는 줄은 최근 수주 수량, 한 번 골라 준 품명·거래처는 기억. 사진은 안 됨.','v2.6.1: 붙여넣기 창에 [📎 PDF·사진 파일] — 발주서 PDF(글자가 든 것)는 바로, 카톡으로 온 발주서 사진·캡처는 기기 안에서 글자를 읽어(실험 · 외부 API 없음 · 처음 한 번 한글 인식 파일 약 1MB 내려받음 · 폰에서 10~30초) 글 칸에 넣고 인식. 폰에서는 [📷 사진 찍기], PC 에서는 그림 붙여넣기(Ctrl+V)·끌어다 놓기도 됨. 잘못 읽힌 글자(햄썸마크 ≈ 햅썹마크 · 2.000 → 2,000)는 닮은 품명으로 맞추고 "확인" 표시.','v2.6.2: 💰 수금관리가 "받았음 체크" 한 표로 — 거래처마다 "몇 월분 · 금액 · 받을 날 · 며칠 늦음"을 한 줄씩, 돈이 오면 [✔ 받았음] → 받은 날·금액(남은 돈이 채워져 있음) 확인 → 저장. 적게 오면 나머지는 미수로, 많이 오면 오래된 달부터 나눠 넣음. 방금 넣은 것은 [취소]. 위에는 늦은 돈 · 이달 안에 받을 돈 · 전체 받을 돈 세 칸만. 예전 표(달별·늦은 일수·연령·청구수금 내역·수정/삭제)는 [⚙ 자세히]로. 수금은 이제 마감과 상관없이 넣고 고칠 수 있음(마감은 출고·입고만 잠금).','v2.6.3: 💰 수금관리 미수 표가 엑셀처럼 — 거래처 한 줄에 최근 네 달 칸(지금이 11월이면 7·8·9·10월), 칸에는 못 받은 돈만(다 받은 달은 빈 칸), 그보다 오래된 것은 "○월 이전" 한 칸에 합침. 빨강 = 안 들어온 돈(받을 날 지남) · 초록 = 받을 돈(이달 안) · 검정 = 기간이 남은 돈. 칸을 누르면 그 줄 아래에 받았음 창(합친 칸은 달마다 따로). [⬇ 엑셀로 받기] · 예전 줄 모양은 [≡ 줄로 보기]. 마감 안내문에 남아 있던 "수금도 막힘" 문구와, 과거 자료만 있는 달의 마감 대조가 "다름"으로 나오던 것도 바로잡음.','v2.6.4: 💰 수금관리 [⚙ 자세히 보기]에서 "📅 받을 돈 — 언제 받나"(달별 · 늦은 일수) 표와 "📊 청구월 기준 연령" 표를 없앰 — 미수 표가 같은 내용을 보여 줌. [자세히 보기]에는 📋 청구·수금 내역(수금 수정/삭제)과 기본 결제조건만 남음.','v2.6.5: 거래처등록에서 「세금계산서 발행 대상」 체크를 끈 거래처는 모든 화면에서 부가세 없이 공급가만 계산 — 거래명세표·매출원장·거래처 원장·수금관리(미수 표·청구·수금 내역·수금 창)·홈·여신·세금계산서 준비·견적서. 이름 옆에 "계산서 X". 계산서를 끊은 달(세금계산서 준비에서 발행완료)·세금계산서로 넣은 과거 자료는 세액 그대로. 매입(사 오는 쪽)은 그대로 10%.'];
+var H_VER_NOTES=['부가세는 모든 화면이 같은 기준입니다(공급가의 10% — v2.6.5부터 「세금계산서 발행 대상」 체크를 끈 거래처는 부가세 없음).','출고·입고 때 단가를 그 기록에 남겨, 제품 단가를 바꿔도 지난 금액은 그대로입니다. 출고 창에 줄마다 단가 칸(특가·샘플).','거래처명·품명을 바꿔도 지난 기록은 옛 이름, 금액·미수금은 이어서 계산됩니다.','마감 잠금은 그 거래의 날짜 기준 — 지난달 수주의 남은 수량은 이번 달 날짜로 처리. 마감 뒤 달라지면 ⚠️.','출고취소는 그 줄의 출고 한 번만 · [✂️ 잔량 마감] · 재고에서 출고 · 재고용 발주.','수금관리는 거래처 잔액 기준 · ⚡ 오래된 미수 달부터 자동 배분 · 📒 거래처 원장 · 반품·매출 가감이 금액에 반영.','엑셀 업로드 전 확인 창·[↩ 이번 업로드 되돌리기] · 데이터 검진 항목 추가 · 팀 초대는 [참여하기]로 · 비밀키는 백업에 안 들어감.','폰: 목록이 카드로 · "오늘·내일 출고" 카드 · 처리 결과는 초록 안내 · 화면마다 ❓ 도움말 · 진단 보고서 · 직인·로고 · PDF로 저장.','🏦 은행 거래내역 파일로 수금 한 번에 넣기 · 🧾 홈택스 매입 세금계산서 대조 · 📊 부가세 신고 자료 · 📋 견적→수주 · 🔁 최근 수주 · 📄 거래처별 단가표.','보안: 앱 잠금(PIN)·편집자는 복원·마감·대량 삭제 불가·복원 전 클라우드 보관 확인·같은 번호 수주가 들어오면 바로 안내. (Firebase 규칙을 다시 붙여 넣어야 완성 — README ⓪)','목록 머리글을 누르면 정렬 · 우클릭으로 열 숨기기 · 열 폭 끌기(PC, 이 기기에 기억) · 폰에서 개발비·거래처별 손익도 카드.','수주 창에 "단가(이번 수주)" 칸 — 견적 단가가 그 수주의 출고 단가로 · 🧾 홈택스 매출 발행 목록 대조로 [발행완료] 한 번에 · 마감 확인창에 그 달 합계 대조·검진 건수 · 📊 부가세 자료에 💳 카드 매입 · 머리줄 "📴 오프라인 · 안 올라간 변경 n건".','📂 복원 전 "무엇이 달라지는지" 미리보기 · [🔍 백업 파일 검사] · 주 1회 백업 파일 자동 다운로드(PC) 기본 켬 · 홈에 "마지막 파일 백업 n일 전".','👥 팀 창: 직원 화면에서 매입단가·원가·손익 가리기(화면에서만) · 로그인 유지 기한(기본 30일) · 기기 [접속 끊기] · 뷰어에게는 선택 체크칸도 숨김.','v2.5.1: 재고시트 [📐](실사 수량으로 재고 맞추기 — 매입원장·손익은 그대로) · 입고 [수량 수정]에서 입고일 변경 · 수주관리 상태 필터에 🚚 미완료 / ✅ 완료(이 기기에 기억) · 제품마스터 매입단가를 바꿀 때 이미 입고한 건(열린 달)에도 소급할지 묻기.','v2.5.2: 거래처 수금조건에 마감후 30일·40일·45일 추가 (수금예정일 = 그 달 말일 + N일).','v2.5.3: 손익분석 🏠 월 고정비(월세·차량 등) → 홈·손익분석·차트·목표의 영업이익이 고정비까지 뺀 값으로 · 수주 창·제품마스터 창에 마진 표시, 5% 이하면 ⚠️(저장 뒤 빨간 안내) · 홈 💵 자금 흐름 카드(이달·다음달 받을 돈·줄 돈·고정비·차이, 매입 결제조건).','v2.5.4: 🧷 공용 품목 — 스트레치필름·밴딩끈처럼 모든 거래처에 파는 품목을 제품마스터에 한 번만 등록(단위 박스·롤 등 · 거래처별 단가 · 재고 하나) · 수주 창 품명 목록에 [공용] · 재고용 발주에 "(공용)" · 거래명세표·발주서·수주 목록에 단위 표시 · [공용으로 묶기].','v2.5.5: 📥 세금계산서로 과거 자료 넣기 — 홈택스 전자세금계산서 목록(매출·매입) 엑셀로 앱을 쓰기 전 달의 매출·매입을 거래처·월별 금액으로(수금관리·거래처 원장·매출원장·매입원장·손익·세금계산서 준비·부가세 자료에 "🧾 세금계산서" 줄) · 수금 목록 엑셀(거래처·청구연월·수금일·금액)로 그 달 수금 · 같은 승인번호·은행원문은 두 번 안 들어감 · [↩ 되돌리기].','v2.5.6: 수금관리 위쪽 표가 "📅 받을 돈 — 언제 받나"(달별)로 — 거래처마다 늦은 돈 · 이달(남은 날) · 다음 달 · … 칸에 "9월분 · 11/09"처럼 어느 달 매출을 언제 받는지 표시 · [⏱ 늦은 일수]로 예전 표 전환(기기에 기억).','v2.5.7: 엑셀 다운로드가 전부 진짜 엑셀 파일(.xlsx)로 — 매출원장·매입원장·손익분석·거래처 원장·부가세 매출처별/매입처별·세금계산서 대조표(예전엔 CSV 라 폰·일부 PC 에서 안 열리거나 글자가 깨졌음). 숫자 칸은 숫자(1,000 단위 표시)라 엑셀에서 바로 합계가 됩니다. 엑셀 라이브러리를 못 불러온 상태(오프라인 첫 실행)면 예전처럼 CSV 로 받고 안내가 뜹니다.','v2.5.8: 수주관리·발주관리·입고관리·납기관리 검색칸 옆에 기간(시작~끝) — 수주일자·발주일·입고일·납기일 기준, [이번 달]·[지난 달]·[최근 30일]·[전체] 버튼, 고른 기간은 기기에 기억. 기간·검색·상태가 걸려 있으면 [📥 엑셀 다운]은 보이는 줄만(파일 이름 끝에 기간). 전체 검색·데이터 검진·QR 로 찾아갈 때는 기간을 전체로 풀어 줌.','v2.5.9: 단가계산기 가공비(㎡당)를 "📋 골형태별 단조율 · 가공비"의 [✏️ 가공비]에서 바꿀 수 있음 — 단골(SW: A·B·E골)·이중골(DW: BA·BB·EB골) 따로, 기본 110·130원, 저장하면 ㎡ 단가·매당 원가·원지 인상 영향표에 바로 반영되고 다른 기기에도 함께. 오른쪽 아래 🤖 AI 도우미(외부 API 호출)는 뺐고 이 기기에 저장돼 있던 API 키는 지움.','v2.6.0: 📋 붙여넣기로 수주 입력 — 수주관리 [📋 붙여넣기 입력](수주 창에도 버튼): 카톡·문자 내용, 엑셀 발주서의 셀, PDF 발주서 글자를 붙여 넣으면 거래처(상호·관리상호)·수주일(발주일)·줄마다 품명(제품마스터와 맞춤)·수량(매·장·개, 3P는 1P 수량으로)·납기일(11월 10일·11/10)을 알아내어 미리보기 → [수주로 넣기]로 수주 창에 차례로 채워 자동 저장(한 건씩 확인도 됨). 수량 없는 줄은 최근 수주 수량, 한 번 골라 준 품명·거래처는 기억. 사진은 안 됨.','v2.6.1: 붙여넣기 창에 [📎 PDF·사진 파일] — 발주서 PDF(글자가 든 것)는 바로, 카톡으로 온 발주서 사진·캡처는 기기 안에서 글자를 읽어(실험 · 외부 API 없음 · 처음 한 번 한글 인식 파일 약 1MB 내려받음 · 폰에서 10~30초) 글 칸에 넣고 인식. 폰에서는 [📷 사진 찍기], PC 에서는 그림 붙여넣기(Ctrl+V)·끌어다 놓기도 됨. 잘못 읽힌 글자(햄썸마크 ≈ 햅썹마크 · 2.000 → 2,000)는 닮은 품명으로 맞추고 "확인" 표시.','v2.6.2: 💰 수금관리가 "받았음 체크" 한 표로 — 거래처마다 "몇 월분 · 금액 · 받을 날 · 며칠 늦음"을 한 줄씩, 돈이 오면 [✔ 받았음] → 받은 날·금액(남은 돈이 채워져 있음) 확인 → 저장. 적게 오면 나머지는 미수로, 많이 오면 오래된 달부터 나눠 넣음. 방금 넣은 것은 [취소]. 위에는 늦은 돈 · 이달 안에 받을 돈 · 전체 받을 돈 세 칸만. 예전 표(달별·늦은 일수·연령·청구수금 내역·수정/삭제)는 [⚙ 자세히]로. 수금은 이제 마감과 상관없이 넣고 고칠 수 있음(마감은 출고·입고만 잠금).','v2.6.3: 💰 수금관리 미수 표가 엑셀처럼 — 거래처 한 줄에 최근 네 달 칸(지금이 11월이면 7·8·9·10월), 칸에는 못 받은 돈만(다 받은 달은 빈 칸), 그보다 오래된 것은 "○월 이전" 한 칸에 합침. 빨강 = 안 들어온 돈(받을 날 지남) · 초록 = 받을 돈(이달 안) · 검정 = 기간이 남은 돈. 칸을 누르면 그 줄 아래에 받았음 창(합친 칸은 달마다 따로). [⬇ 엑셀로 받기] · 예전 줄 모양은 [≡ 줄로 보기]. 마감 안내문에 남아 있던 "수금도 막힘" 문구와, 과거 자료만 있는 달의 마감 대조가 "다름"으로 나오던 것도 바로잡음.','v2.6.4: 💰 수금관리 [⚙ 자세히 보기]에서 "📅 받을 돈 — 언제 받나"(달별 · 늦은 일수) 표와 "📊 청구월 기준 연령" 표를 없앰 — 미수 표가 같은 내용을 보여 줌. [자세히 보기]에는 📋 청구·수금 내역(수금 수정/삭제)과 기본 결제조건만 남음.','v2.6.5: 거래처등록에서 「세금계산서 발행 대상」 체크를 끈 거래처는 모든 화면에서 부가세 없이 공급가만 계산 — 거래명세표·매출원장·거래처 원장·수금관리(미수 표·청구·수금 내역·수금 창)·홈·여신·세금계산서 준비·견적서. 이름 옆에 "계산서 X". 계산서를 끊은 달(세금계산서 준비에서 발행완료)·세금계산서로 넣은 과거 자료는 세액 그대로. 매입(사 오는 쪽)은 그대로 10%.','v2.6.6: 🧊 3D로 접어 보기 — 제품마스터 목록의 [🧊3D] · 제품 창과 수주 입력 창의 인쇄사양서 · 단가계산기 전개도에서 품목을 접은 모습으로 봅니다(A-1형). 인쇄사양서 그림이 붙어 있으면 사양서 속 전개도를 찾아 디자인을 상자 겉면에 입힘 · 못 찾으면 모서리를 끌어 맞춤(기기에 기억) · 보기만 하는 기능이라 저장 자료는 그대로.'];
 // 도움말 버튼이 부르는 동작 (버튼에는 키만 — 이름·자료는 넣지 않음)
 function _hCan(act){ try{ return typeof canDo==='function'?canDo(act)!==false:true; }catch(e){ return true; } }
 function _hNoEdit(){ try{ showInfoToast('🔒 보기 전용 권한이라 입력 창을 열 수 없습니다.','#B71C1C'); }catch(e){} }
